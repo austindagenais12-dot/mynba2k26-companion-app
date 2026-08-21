@@ -31,13 +31,13 @@ export type Milestone = { id: string; name: string; achieved: boolean; date?: st
 export type CareerState = {
   version: number;
   player: {
-    name: string; position: string; age: number; height: string; weight: number; hometown: string; stage: Stage; route: string;
+    name: string; position: string; age: number; height: string; weight: number; hometown: string; nationality: string; dominantHand: 'Right'|'Left'; highSchoolYear: string; stage: Stage; route: string;
     schoolOrClub: string; team: string; jersey: number; overall: number; potential: number; seasonYear: number; currentDate: string;
     phase: string; xp: number; money: number; careerEarnings: number; followers: number; marketability: number; morale: number;
     fatigue: number; legacy: number; agentName: string; agentTrust: number; draftProjection: string; draftDeclared: boolean;
     draftPick?: number; role: string; reputation: string[]; traits: string[];
   };
-  settings: { immersionMode: ImmersionMode; simDetail: SimDetail; romanceEnabled: boolean; autosave: boolean };
+  settings: { immersionMode: ImmersionMode; simDetail: SimDetail; romanceEnabled: boolean; autosave: boolean; onboardingComplete: boolean };
   attributes: Attribute[];
   badges: Badge[];
   games: Game[];

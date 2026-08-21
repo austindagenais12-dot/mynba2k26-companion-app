@@ -21,16 +21,16 @@ const badges: Badge[] = badgeNames.map(([name,category], i) => ({name,category,l
 export function createDefaultState(): CareerState {
   const today = new Date().toISOString().slice(0,10);
   return {
-    version: 1,
+    version: 2,
     player: {
-      name:'Marcus Carter',position:'PG',age:17,height:"6'3\"",weight:175,hometown:'Halifax, NS',stage:'High School',route:'Undecided',schoolOrClub:'Lakeshore Prep',team:'',jersey:3,
+      name:'Marcus Carter',position:'PG',age:17,height:"6'3\"",weight:175,hometown:'Halifax, NS',nationality:'Canada',dominantHand:'Right',highSchoolYear:'Senior',stage:'High School',route:'Undecided',schoolOrClub:'Lakeshore Prep',team:'',jersey:3,
       overall:64,potential:91,seasonYear:2026,currentDate:today,phase:'Preseason',xp:0,money:0,careerEarnings:0,followers:12800,marketability:45,morale:78,fatigue:12,legacy:0,
       agentName:'Unrepresented',agentTrust:50,draftProjection:'Unranked',draftDeclared:false,role:'Prospect',reputation:['Unknown'],traits:['Competitive']
     },
-    settings:{immersionMode:'Immersive',simDetail:'Normal',romanceEnabled:false,autosave:true},
+    settings:{immersionMode:'Immersive',simDetail:'Normal',romanceEnabled:false,autosave:true,onboardingComplete:false},
     attributes,badges,games:[],
     relationships:[
-      {id:'r1',name:'Maya Carter',role:'Family',trust:94,respect:88,friendship:92,loyalty:98,rivalry:0,resentment:0,influence:82,closeness:94,status:'Very Close',memories:['Supported you before your basketball career took off.']},
+      {id:'r1',name:'Family Member',role:'Family',trust:94,respect:88,friendship:92,loyalty:98,rivalry:0,resentment:0,influence:82,closeness:94,status:'Very Close',memories:['Supported you before your basketball career took off.']},
       {id:'r2',name:'Coach Reynolds',role:'Coach',trust:68,respect:74,friendship:35,loyalty:52,rivalry:0,resentment:3,influence:88,closeness:48,status:'Positive',memories:['Believed in your upside early.']}
     ],
     social:[

@@ -9,7 +9,8 @@ import { createDefaultState } from './src/defaultState';
 import {
   addUserPost, advanceSeason, attributeUpgradeCost, changeSetting, chooseRoute, confirmDraftResult,
   declareForDraft, generateEvent, logGame, manualTransaction, offseasonActivity, randomizeProspect,
-  resolveEvent, simulatePreNBASegment, sponsorAction, toggleLike, upgradeAttribute
+  resolveEvent, simulatePreNBASegment, sponsorAction, toggleLike, upgradeAttribute,
+  initializeCareerProfile, updatePlayerProfile, PlayerProfileInput
 } from './src/engine';
 import { CareerState, DynamicEvent, SocialPost } from './src/model';
 
@@ -30,6 +31,37 @@ const importances = ['Regular','Rivalry','Playoff','Elimination','Finals'] as co
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 const fmtMoney = (n:number) => n >= 1_000_000 ? `$${(n/1_000_000).toFixed(1)}M` : `$${Math.round(n/1000)}K`;
 const pct = (n:number) => `${Math.max(0,Math.min(100,n))}%`;
+
+const positions=['PG','SG','SF','PF','C'];
+const schoolYears=['Freshman','Sophomore','Junior','Senior'];
+
+function migrateCareerState(raw:any):CareerState {
+  const base=createDefaultState();
+  if(!raw||typeof raw!=='object')return base;
+  return {
+    ...base,
+    ...raw,
+    version:2,
+    player:{...base.player,...(raw.player||{})},
+    settings:{...base.settings,...(raw.settings||{}),onboardingComplete:raw.settings?.onboardingComplete??false},
+    attributes:Array.isArray(raw.attributes)?raw.attributes:base.attributes,
+    badges:Array.isArray(raw.badges)?raw.badges:base.badges,
+    games:Array.isArray(raw.games)?raw.games:[],
+    relationships:Array.isArray(raw.relationships)?raw.relationships:base.relationships,
+    social:Array.isArray(raw.social)?raw.social:base.social,
+    news:Array.isArray(raw.news)?raw.news:base.news,
+    events:Array.isArray(raw.events)?raw.events:[],
+    sponsors:Array.isArray(raw.sponsors)?raw.sponsors:[],
+    storylines:Array.isArray(raw.storylines)?raw.storylines:[],
+    history:Array.isArray(raw.history)?raw.history:base.history,
+    notifications:Array.isArray(raw.notifications)?raw.notifications:[],
+    finances:Array.isArray(raw.finances)?raw.finances:[],
+    transactions:Array.isArray(raw.transactions)?raw.transactions:[],
+    worldPlayers:Array.isArray(raw.worldPlayers)?raw.worldPlayers:base.worldPlayers,
+    prospects:Array.isArray(raw.prospects)?raw.prospects:base.prospects,
+    milestones:Array.isArray(raw.milestones)?raw.milestones:base.milestones
+  };
+}
 
 function Card({children, style}:{children:React.ReactNode;style?:any}) { return <View style={[styles.card,style]}>{children}</View>; }
 function Row({children,style}:{children:React.ReactNode;style?:any}) { return <View style={[styles.row,style]}>{children}</View>; }
@@ -59,8 +91,11 @@ export default function App(){
   const [event,setEvent]=useState<DynamicEvent|null>(null);
   const [socialDetail,setSocialDetail]=useState<SocialPost|null>(null);
 
-  useEffect(()=>{(async()=>{try{const raw=await Storage.getItem(SAVE_KEY);if(raw)setState(JSON.parse(raw));}catch{}finally{setLoaded(true)}})()},[]);
+  useEffect(()=>{(async()=>{try{const raw=await Storage.getItem(SAVE_KEY);if(raw)setState(migrateCareerState(JSON.parse(raw)));}catch{}finally{setLoaded(true)}})()},[]);
   useEffect(()=>{if(!loaded)return;const t=setTimeout(()=>Storage.setItem(SAVE_KEY,JSON.stringify(state)).catch(()=>{}),250);return()=>clearTimeout(t)},[state,loaded]);
+
+  if(!loaded)return <SafeAreaView style={styles.safe}><StatusBar style="light"/><View style={styles.splash}><Text style={styles.splashMark}>2K</Text><Text style={styles.splashTitle}>Career Companion</Text><Text style={styles.muted}>Loading your universe…</Text></View></SafeAreaView>;
+  if(!state.settings.onboardingComplete)return <OnboardingScreen state={state} onStart={(profile)=>setState(initializeCareerProfile(state,profile))}/>;
 
   const unread=state.notifications.filter(n=>!n.read).length;
   const activeStory=state.storylines.find(s=>s.status==='Active');
@@ -87,6 +122,63 @@ export default function App(){
     <EventModal state={state} event={event} onClose={()=>setEvent(null)} onResolve={(idx)=>{if(!event)return;setState(resolveEvent(state,event.id,idx));setEvent(null)}}/>
     <SocialModal state={state} post={socialDetail} onClose={()=>setSocialDetail(null)} onRespond={(text)=>{let s=addUserPost(state,`@${socialDetail?.handle.replace('@','')} ${text}`);setState(s);setSocialDetail(null)}}/>
   </SafeAreaView>
+}
+
+
+function ProfileForm({state,onSave,submitLabel='Save player profile'}:{state:CareerState;onSave:(profile:PlayerProfileInput)=>void;submitLabel?:string}){
+  const p=state.player;
+  const [name,setName]=useState(p.name||'');
+  const [position,setPosition]=useState(p.position||'PG');
+  const [age,setAge]=useState(String(p.age||17));
+  const [height,setHeight]=useState(p.height||"6'3\"");
+  const [weight,setWeight]=useState(String(p.weight||175));
+  const [hometown,setHometown]=useState(p.hometown||'');
+  const [nationality,setNationality]=useState(p.nationality||'');
+  const [dominantHand,setDominantHand]=useState<'Right'|'Left'>(p.dominantHand||'Right');
+  const [highSchoolYear,setHighSchoolYear]=useState(p.highSchoolYear||'Senior');
+  const [schoolOrClub,setSchoolOrClub]=useState(p.schoolOrClub||'');
+  const [jersey,setJersey]=useState(String(p.jersey??0));
+  const submit=()=>{
+    const cleanName=name.trim(),cleanHome=hometown.trim(),cleanSchool=schoolOrClub.trim(),cleanHeight=height.trim();
+    const ageN=Number(age),weightN=Number(weight),jerseyN=Number(jersey);
+    if(cleanName.length<2)return Alert.alert('Enter your player name','Use the name you want the companion to use throughout your career.');
+    if(!cleanHome)return Alert.alert('Enter a hometown','Your hometown is used for local media and career events.');
+    if(!cleanSchool)return Alert.alert('Enter a school or club','This is your starting high-school, academy or club name.');
+    if(!cleanHeight)return Alert.alert('Enter a height','Example: 6\'3"');
+    if(!Number.isFinite(ageN)||ageN<14||ageN>22)return Alert.alert('Check age','Starting age must be between 14 and 22.');
+    if(!Number.isFinite(weightN)||weightN<120||weightN>400)return Alert.alert('Check weight','Enter a weight between 120 and 400 lbs.');
+    if(!Number.isFinite(jerseyN)||jerseyN<0||jerseyN>99)return Alert.alert('Check jersey number','Use a jersey number from 0 to 99.');
+    onSave({name:cleanName,position,age:ageN,height:cleanHeight,weight:weightN,hometown:cleanHome,nationality:nationality.trim()||'Unknown',dominantHand,highSchoolYear,schoolOrClub:cleanSchool,jersey:jerseyN});
+  };
+  return <View style={{gap:12}}>
+    <Card>
+      <Text style={styles.cardTitle}>Identity</Text>
+      <Field label="Player name" value={name} onChange={setName} placeholder="Your player's full name"/>
+      <View style={styles.formGrid}><Field label="Hometown" value={hometown} onChange={setHometown} placeholder="Toronto, ON"/><Field label="Nationality" value={nationality} onChange={setNationality} placeholder="Canada"/></View>
+      <Field label="Starting high school / academy / club" value={schoolOrClub} onChange={setSchoolOrClub} placeholder="Create a school or club name"/>
+    </Card>
+    <Card>
+      <Text style={styles.cardTitle}>Basketball profile</Text>
+      <Text style={styles.label}>Position</Text><View style={styles.chips}>{positions.map(x=><Pressable key={x} onPress={()=>setPosition(x)} style={[styles.chip,position===x&&styles.chipActive]}><Text style={[styles.chipText,position===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View>
+      <Text style={styles.label}>High-school year</Text><View style={styles.chips}>{schoolYears.map(x=><Pressable key={x} onPress={()=>setHighSchoolYear(x)} style={[styles.chip,highSchoolYear===x&&styles.chipActive]}><Text style={[styles.chipText,highSchoolYear===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View>
+      <Text style={styles.label}>Dominant hand</Text><View style={styles.chips}>{(['Right','Left'] as const).map(x=><Pressable key={x} onPress={()=>setDominantHand(x)} style={[styles.chip,dominantHand===x&&styles.chipActive]}><Text style={[styles.chipText,dominantHand===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View>
+      <View style={styles.formGrid}><Field label="Age" value={age} onChange={setAge} keyboard="number-pad"/><Field label="Height" value={height} onChange={setHeight} placeholder={'6\'3"'}/><Field label="Weight (lbs)" value={weight} onChange={setWeight} keyboard="number-pad"/><Field label="Jersey #" value={jersey} onChange={setJersey} keyboard="number-pad"/></View>
+    </Card>
+    <Btn label={submitLabel} onPress={submit}/>
+  </View>;
+}
+
+function OnboardingScreen({state,onStart}:{state:CareerState;onStart:(profile:PlayerProfileInput)=>void}){
+  return <SafeAreaView style={styles.safe}><StatusBar style="light"/><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView contentContainerStyle={styles.onboardingScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View style={styles.onboardingHero}><View style={styles.onboardingLogo}><Text style={styles.onboardingLogoText}>2K</Text></View><Pill text="CAREER COMPANION V1.1"/><Text style={styles.onboardingTitle}>Create your prospect</Text><Text style={styles.onboardingSubtitle}>Set the identity the app will use across recruiting, social media, relationships, sponsors, news and your entire career history.</Text></View>
+    <ProfileForm state={state} onSave={onStart} submitLabel="Start career"/>
+    <Text style={[styles.mutedSmall,{textAlign:'center',paddingHorizontal:10}]}>You can edit these details later from More → Player. Your ratings and potential remain part of the career simulation.</Text>
+  </ScrollView></KeyboardAvoidingView></SafeAreaView>;
+}
+
+function ProfileEditorModal({state,visible,onClose,onSave}:{state:CareerState;visible:boolean;onClose:()=>void;onSave:(profile:PlayerProfileInput)=>void}){
+  if(!visible)return null;
+  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalScrim}><View style={[styles.modalSheet,{maxHeight:'94%'}]}><Row style={{justifyContent:'space-between',alignItems:'center'}}><View><Text style={styles.modalTitle}>Edit player profile</Text><Text style={styles.mutedSmall}>Changes affect future companion content.</Text></View><Pressable onPress={onClose}><Text style={styles.close}>×</Text></Pressable></Row><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><ProfileForm state={state} onSave={onSave} submitLabel="Save changes"/></ScrollView></View></View></Modal>;
 }
 
 function Header({state,unread,onNotifications}:{state:CareerState;unread:number;onNotifications:()=>void}){
@@ -122,7 +214,7 @@ function Career({state,setState}:{state:CareerState;setState:(s:CareerState)=>vo
   return <ScrollView contentContainerStyle={styles.scroll}>
     <SectionTitle title="Career" side={<Pill text={p.stage}/>}/>
     {p.stage==='High School'?<>
-      <Card><Text style={styles.cardTitle}>Build your origin</Text><Text style={styles.bodyText}>Your pre-NBA career is intentionally compressed. Generate a prospect, pick a pathway, then simulate only the important checkpoints.</Text><View style={styles.infoGrid}><Info label="Position" value={p.position}/><Info label="Height" value={p.height}/><Info label="Overall" value={`${p.overall}`}/><Info label="Potential" value={`${p.potential}`}/></View><Btn label="Randomize prospect" onPress={()=>setState(randomizeProspect(state))}/></Card>
+      <Card><Text style={styles.cardTitle}>Build your origin</Text><Text style={styles.bodyText}>Your identity is locked in from setup. Generate a randomized basketball profile, pick a pathway, then simulate only the important checkpoints.</Text><View style={styles.infoGrid}><Info label="Position" value={p.position}/><Info label="Height" value={p.height}/><Info label="Overall" value={`${p.overall}`}/><Info label="Potential" value={`${p.potential}`}/></View><Btn label="Randomize basketball profile" onPress={()=>setState(randomizeProspect(state))}/></Card>
       <Card><Text style={styles.cardTitle}>Choose a path</Text>{routes.map(r=><Pressable key={r} onPress={()=>setState(chooseRoute(state,r))} style={styles.choiceRow}><View><Text style={styles.listTitle}>{r}</Text><Text style={styles.mutedSmall}>{routeDescription(r)}</Text></View><Text style={styles.arrow}>›</Text></Pressable>)}</Card>
     </>:null}
 
@@ -180,11 +272,22 @@ function MoreRoot({screen,setScreen,state,setState,onEvent}:{screen:any;setScree
 }
 
 function PlayerScreen({state,setState,back}:{state:CareerState;setState:(s:CareerState)=>void;back:React.ReactNode}){
-  const cats=[...new Set(state.attributes.map(a=>a.category))];return <ScrollView contentContainerStyle={styles.scroll}>{back}<SectionTitle title="Player Development" side={<Pill text={`${state.player.xp.toLocaleString()} XP`}/>}/>
-    <View style={styles.metrics}><Metric label="OVR" value={state.player.overall}/><Metric label="POT" value={state.player.potential}/><Metric label="MORALE" value={state.player.morale}/><Metric label="FATIGUE" value={state.player.fatigue}/></View>
-    {cats.map(cat=><Card key={cat}><Text style={styles.cardTitle}>{cat}</Text>{state.attributes.filter(a=>a.category===cat).map(a=>{const cost=attributeUpgradeCost(a.rating);return <View key={a.name} style={styles.attrRow}><View style={{flex:1}}><Text style={styles.listTitle}>{a.name}</Text><Text style={styles.mutedSmall}>Upgrade: {cost.toLocaleString()} XP</Text><Progress value={a.rating}/></View><Text style={styles.attrValue}>{a.rating}</Text><Btn small label="+1" variant="outline" onPress={()=>{const r=upgradeAttribute(state,a.name);setState(r.state);if(r.message.startsWith('Need'))Alert.alert('Not enough XP',r.message)}}/></View>})}</Card>)}
-    <Card><Text style={styles.cardTitle}>Badges</Text>{state.badges.map(b=><View key={b.name} style={styles.listRow}><View style={{flex:1}}><Text style={styles.listTitle}>{b.name}</Text><Text style={styles.mutedSmall}>{b.category}</Text></View><Pill text={b.level} tone={b.level==='Locked'?'muted':'accent'}/></View>)}</Card>
-  </ScrollView>
+  const [editingProfile,setEditingProfile]=useState(false);
+  const cats=[...new Set(state.attributes.map(a=>a.category))];
+  const p=state.player;
+  return <>
+    <ScrollView contentContainerStyle={styles.scroll}>{back}<SectionTitle title="Player" side={<Pill text={`${p.overall} OVR`}/>}/>
+      <Card>
+        <Row style={{justifyContent:'space-between',alignItems:'center'}}><View style={{flex:1}}><Text style={styles.cardTitle}>{p.name}</Text><Text style={styles.mutedSmall}>{p.position} • #{p.jersey} • {p.height} • {p.weight} lbs</Text></View><Btn small label="Edit profile" variant="outline" onPress={()=>setEditingProfile(true)}/></Row>
+        <View style={styles.infoGrid}><Info label="Age" value={`${p.age}`}/><Info label="Hometown" value={p.hometown}/><Info label="Nationality" value={p.nationality}/><Info label="Dominant hand" value={p.dominantHand}/><Info label="Starting program" value={p.schoolOrClub}/><Info label="HS year" value={p.highSchoolYear}/></View>
+      </Card>
+      <SectionTitle title="Player Development" side={<Pill text={`${p.xp.toLocaleString()} XP`}/>}/>
+      <View style={styles.metrics}><Metric label="OVR" value={p.overall}/><Metric label="POT" value={p.potential}/><Metric label="MORALE" value={p.morale}/><Metric label="FATIGUE" value={p.fatigue}/></View>
+      {cats.map(cat=><Card key={cat}><Text style={styles.cardTitle}>{cat}</Text>{state.attributes.filter(a=>a.category===cat).map(a=>{const cost=attributeUpgradeCost(a.rating);return <View key={a.name} style={styles.attrRow}><View style={{flex:1}}><Text style={styles.listTitle}>{a.name}</Text><Text style={styles.mutedSmall}>Upgrade: {cost.toLocaleString()} XP</Text><Progress value={a.rating}/></View><Text style={styles.attrValue}>{a.rating}</Text><Btn small label="+1" variant="outline" onPress={()=>{const r=upgradeAttribute(state,a.name);setState(r.state);if(r.message.startsWith('Need'))Alert.alert('Not enough XP',r.message)}}/></View>})}</Card>)}
+      <Card><Text style={styles.cardTitle}>Badges</Text>{state.badges.map(b=><View key={b.name} style={styles.listRow}><View style={{flex:1}}><Text style={styles.listTitle}>{b.name}</Text><Text style={styles.mutedSmall}>{b.category}</Text></View><Pill text={b.level} tone={b.level==='Locked'?'muted':'accent'}/></View>)}</Card>
+    </ScrollView>
+    <ProfileEditorModal state={state} visible={editingProfile} onClose={()=>setEditingProfile(false)} onSave={(profile)=>{setState(updatePlayerProfile(state,profile));setEditingProfile(false)}}/>
+  </>;
 }
 
 function Relationships({state,setState,back}:{state:CareerState;setState:(s:CareerState)=>void;back:React.ReactNode}){
@@ -230,7 +333,7 @@ function History({state,back}:{state:CareerState;back:React.ReactNode}){
 function Settings({state,setState,back}:{state:CareerState;setState:(s:CareerState)=>void;back:React.ReactNode}){
   const [importText,setImportText]=useState('');
   const reset=()=>Alert.alert('Reset career?','This permanently replaces the current local save.',[{text:'Cancel',style:'cancel'},{text:'Reset',style:'destructive',onPress:()=>setState(createDefaultState())}]);
-  const doImport=()=>{try{const parsed=JSON.parse(importText);if(!parsed.player||!parsed.attributes)throw new Error();setState(parsed);setImportText('');Alert.alert('Imported','Career save loaded.')}catch{Alert.alert('Invalid save','The pasted JSON is not a valid Career Companion save.')}};
+  const doImport=()=>{try{const parsed=JSON.parse(importText);if(!parsed.player||!parsed.attributes)throw new Error();setState(migrateCareerState(parsed));setImportText('');Alert.alert('Imported','Career save loaded.')}catch{Alert.alert('Invalid save','The pasted JSON is not a valid Career Companion save.')}};
   return <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{back}<SectionTitle title="Settings"/>
     <Card><Text style={styles.cardTitle}>Immersion</Text><Text style={styles.label}>Mode</Text><View style={styles.chips}>{['Basketball Focused','Immersive','Full Life','Chaos'].map(x=><Pressable key={x} onPress={()=>setState(changeSetting(state,'immersionMode',x))} style={[styles.chip,state.settings.immersionMode===x&&styles.chipActive]}><Text style={[styles.chipText,state.settings.immersionMode===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View><Text style={styles.label}>Pre-NBA simulation detail</Text><View style={styles.chips}>{['Quick','Normal','Detailed'].map(x=><Pressable key={x} onPress={()=>setState(changeSetting(state,'simDetail',x))} style={[styles.chip,state.settings.simDetail===x&&styles.chipActive]}><Text style={[styles.chipText,state.settings.simDetail===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View><Row style={{justifyContent:'space-between',alignItems:'center'}}><View style={{flex:1}}><Text style={styles.listTitle}>Optional romantic-life events</Text><Text style={styles.mutedSmall}>Off by default. Does not affect core career progression.</Text></View><Switch value={state.settings.romanceEnabled} onValueChange={v=>setState(changeSetting(state,'romanceEnabled',v))} trackColor={{true:ACCENT,false:'#343b46'}}/></Row></Card>
     <Card><Text style={styles.cardTitle}>Backup / transfer</Text><Text style={styles.bodyText}>The Android and iOS versions use the same JSON save format, so you can move a career between phones manually.</Text><Btn label="Share / export save" onPress={()=>Share.share({title:'NBA 2K26 Career Companion Save',message:JSON.stringify(state)})}/><Text style={styles.label}>Import save JSON</Text><TextInput multiline value={importText} onChangeText={setImportText} placeholder="Paste exported save JSON here" placeholderTextColor="#626b78" style={[styles.input,{minHeight:110,textAlignVertical:'top'}]}/><Btn label="Import pasted save" variant="outline" disabled={!importText.trim()} onPress={doImport}/></Card>
@@ -251,6 +354,8 @@ function Info({label,value}:{label:string;value:string}){return <View style={sty
 
 const styles=StyleSheet.create({
   safe:{flex:1,backgroundColor:BG},app:{flex:1,backgroundColor:BG},body:{flex:1},scroll:{padding:16,paddingBottom:32,gap:12},
+  splash:{flex:1,alignItems:'center',justifyContent:'center',gap:10,padding:24},splashMark:{color:'#fff',fontSize:28,fontWeight:'900',backgroundColor:ACCENT,paddingHorizontal:16,paddingVertical:10,borderRadius:16},splashTitle:{color:TEXT,fontSize:24,fontWeight:'900'},
+  onboardingScroll:{padding:18,paddingBottom:40,gap:14},onboardingHero:{gap:10,paddingVertical:12},onboardingLogo:{width:56,height:56,borderRadius:18,backgroundColor:ACCENT,alignItems:'center',justifyContent:'center'},onboardingLogoText:{color:'#fff',fontWeight:'900',fontSize:21},onboardingTitle:{color:TEXT,fontSize:30,fontWeight:'900',marginTop:4},onboardingSubtitle:{color:'#c9d0da',fontSize:15,lineHeight:22},
   header:{minHeight:72,paddingHorizontal:16,paddingVertical:10,borderBottomWidth:1,borderBottomColor:BORDER,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:BG},
   avatar:{width:48,height:48,borderRadius:24,backgroundColor:ACCENT,alignItems:'center',justifyContent:'center'},avatarText:{color:'#fff',fontWeight:'900',fontSize:16},playerName:{color:TEXT,fontSize:18,fontWeight:'800',maxWidth:190},sub:{color:MUTED,fontSize:12,marginTop:3},
   bell:{width:42,height:42,borderRadius:14,backgroundColor:PANEL,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:BORDER},badge:{position:'absolute',right:-3,top:-4,minWidth:18,height:18,borderRadius:9,backgroundColor:ACCENT,alignItems:'center',justifyContent:'center',paddingHorizontal:4},badgeText:{color:'#fff',fontSize:10,fontWeight:'900'},

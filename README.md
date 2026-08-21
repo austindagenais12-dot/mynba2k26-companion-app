@@ -79,3 +79,9 @@ Open **More → Settings → Share / export save** on one phone. Import the resu
 ## Copyright / branding
 
 This is a fan-made companion project. NBA, NBA 2K and related marks belong to their respective owners. The project does not ship game assets or circumvent game protections.
+
+## Version 1.1 — Player Setup Update
+
+Version 1.1 adds a first-launch prospect setup screen and an editable player profile. You can now set your player name, position, age, height, weight, hometown, nationality, dominant hand, high-school year, starting school/academy/club, and jersey number before the career begins. Existing Version 1 saves are migrated and shown the setup screen once so the placeholder identity can be replaced without deleting career progress. Player identity can later be edited from **More → Player → Edit profile**.
+
+The **Randomize basketball profile** action now preserves your chosen identity, body information, position, school, and jersey number; it only randomizes basketball ability/upside/personality.

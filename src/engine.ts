@@ -46,6 +46,49 @@ export function calculateOverall(s:CareerState):number {
 
 export function attributeUpgradeCost(rating:number){ return Math.round(300 + Math.pow(Math.max(0,rating-55),1.68)*21); }
 
+export type PlayerProfileInput = {
+  name:string; position:string; age:number; height:string; weight:number; hometown:string; nationality:string;
+  dominantHand:'Right'|'Left'; highSchoolYear:string; schoolOrClub:string; jersey:number;
+};
+
+function applyProfileFields(s:CareerState,input:PlayerProfileInput){
+  s.player.name=input.name.trim();
+  s.player.position=input.position;
+  s.player.age=clamp(input.age,14,40);
+  s.player.height=input.height.trim();
+  s.player.weight=clamp(input.weight,120,400);
+  s.player.hometown=input.hometown.trim();
+  s.player.nationality=input.nationality.trim()||'Unknown';
+  s.player.dominantHand=input.dominantHand;
+  s.player.highSchoolYear=input.highSchoolYear;
+  s.player.schoolOrClub=input.schoolOrClub.trim();
+  s.player.jersey=clamp(input.jersey,0,99);
+}
+
+export function initializeCareerProfile(state:CareerState,input:PlayerProfileInput):CareerState {
+  const s=clone(state); const oldName=s.player.name; const oldSchool=s.player.schoolOrClub;
+  applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(2,s.version||1);
+  // Replace only the starter placeholder copy. Existing career history is preserved for upgraded saves.
+  if(s.history.length===1 && s.history[0]?.title==='Career begins'){
+    s.history[0].body=`${s.player.name}'s basketball story begins in ${s.player.hometown}.`;
+    s.history[0].canon='User Confirmed';
+  }
+  const swap=(text:string)=>text.split(oldName).join(s.player.name).split(oldSchool).join(s.player.schoolOrClub);
+  s.social=s.social.map(post=>({...post,body:swap(post.body)}));
+  s.news=s.news.map(item=>({...item,body:swap(item.body),headline:swap(item.headline)}));
+  if(s.relationships.length && s.relationships[0].name==='Maya Carter')s.relationships[0].name='Family Member';
+  calculateOverall(s);
+  notify(s,'✅','Player profile ready',`${s.player.name} • ${s.player.position} • #${s.player.jersey}`);
+  return s;
+}
+
+export function updatePlayerProfile(state:CareerState,input:PlayerProfileInput):CareerState {
+  const s=clone(state); const oldName=s.player.name; applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(2,s.version||1); calculateOverall(s);
+  pushHistory(s,'Player profile updated',`${oldName} is now listed as ${s.player.name}, ${s.player.position}, #${s.player.jersey}.`,'Career','Personal','User Confirmed');
+  notify(s,'✏️','Profile updated',`${s.player.name} • ${s.player.height} • ${s.player.weight} lbs`);
+  return s;
+}
+
 export function upgradeAttribute(state:CareerState,name:string):{state:CareerState;message:string} {
   const s=clone(state); const a=s.attributes.find(x=>x.name===name); if(!a)return{state:s,message:'Attribute not found.'};
   if(a.rating>=a.cap)return{state:s,message:'Attribute cap reached.'};
@@ -57,13 +100,13 @@ export function upgradeAttribute(state:CareerState,name:string):{state:CareerSta
 
 export function randomizeProspect(state:CareerState):CareerState {
   const s=clone(state);
-  const pos=pick(['PG','SG','SF','PF','C']);
-  const heights:Record<string,string[]>={PG:["6'0\"","6'1\"","6'2\"","6'3\"","6'4\""],SG:["6'3\"","6'4\"","6'5\"","6'6\""],SF:["6'5\"","6'6\"","6'7\"","6'8\""],PF:["6'7\"","6'8\"","6'9\"","6'10\""],C:["6'9\"","6'10\"","6'11\"","7'0\""]};
-  s.player.position=pos; s.player.height=pick(heights[pos]); s.player.weight=pos==='PG'?170+Math.floor(Math.random()*25):pos==='C'?225+Math.floor(Math.random()*45):190+Math.floor(Math.random()*40);
-  s.player.overall=60+Math.floor(Math.random()*8); s.player.potential=82+Math.floor(Math.random()*15); s.player.followers=2500+Math.floor(Math.random()*20000); s.player.marketability=35+Math.floor(Math.random()*20);
+  // Preserve the identity/body information the user entered on the setup screen.
+  // This button now randomizes basketball ability, upside and personality only.
+  const pos=s.player.position;
+  s.player.potential=82+Math.floor(Math.random()*15); s.player.followers=2500+Math.floor(Math.random()*20000); s.player.marketability=35+Math.floor(Math.random()*20);
   s.player.traits=[pick(personalities)];
-  s.attributes=s.attributes.map(a=>({...a,rating:clamp(a.rating+(Math.floor(Math.random()*9)-4),30,88)})); calculateOverall(s);
-  pushHistory(s,'Prospect profile generated',`You begin as a ${s.player.overall} OVR ${pos} with ${s.player.potential} potential.`,'Career','Career','User Confirmed');
+  s.attributes=s.attributes.map(a=>({...a,rating:clamp(a.rating+(Math.floor(Math.random()*11)-5),30,88)})); calculateOverall(s);
+  pushHistory(s,'Basketball profile generated',`${s.player.name} begins as a ${s.player.overall} OVR ${pos} with ${s.player.potential} potential.`,'Career','Career','User Confirmed');
   return s;
 }
 
