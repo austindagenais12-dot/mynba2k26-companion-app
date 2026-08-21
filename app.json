@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "NBA 2K26 Career Companion",
+    "slug": "nba2k26-career-companion-android",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.careercompanion.nba2k26",
+      "versionCode": 1,
+      "adaptiveIcon": { "backgroundColor": "#0b0d11" }
+    },
+    "runtimeVersion": { "policy": "nativeVersion" }
+  }
+}
