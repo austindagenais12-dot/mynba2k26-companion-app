@@ -1,6 +1,6 @@
 workflows:
   android-apk:
-    name: NBA 2K26 Companion Android APK
+    name: NBA 2K26 Companion Android Release
     instance_type: mac_mini_m2
     max_build_duration: 60
 
@@ -14,17 +14,17 @@ workflows:
 
       - name: Generate Android project
         script: |
-          npx expo prebuild --platform android --non-interactive
+          npx expo prebuild --platform android --non-interactive --clean
 
       - name: Set Android SDK
         script: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
 
-      - name: Build APK
+      - name: Build standalone release APK
         script: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
     artifacts:
-      - android/app/build/outputs/apk/debug/*.apk
+      - android/app/build/outputs/apk/release/*.apk
