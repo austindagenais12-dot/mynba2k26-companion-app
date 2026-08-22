@@ -1,5 +1,6 @@
 import { CareerState, Attribute, Badge } from './model';
 import { NBA_SCHEDULE_2025_26 } from './nbaSchedule2025';
+import { createStarterPhoneData } from './phone';
 
 const attrs: [string,string,number][] = [
   ['Close Shot','Finishing',66],['Driving Layup','Finishing',74],['Driving Dunk','Finishing',70],['Standing Dunk','Finishing',35],['Post Control','Finishing',42],
@@ -21,8 +22,9 @@ const badges: Badge[] = badgeNames.map(([name,category], i) => ({name,category,l
 
 export function createDefaultState(): CareerState {
   const today = new Date().toISOString().slice(0,10);
+  const phone=createStarterPhoneData(today);
   return {
-    version: 4,
+    version: 5,
     player: {
       name:'Marcus Carter',position:'PG',age:17,height:"6'3\"",weight:175,hometown:'Halifax, NS',nationality:'Canada',dominantHand:'Right',highSchoolYear:'Senior',stage:'High School',route:'Undecided',schoolOrClub:'Lakeshore Prep',team:'',jersey:3,
       overall:64,potential:91,seasonYear:2026,currentDate:today,phase:'Preseason',xp:0,money:0,careerEarnings:0,followers:12800,marketability:45,morale:78,fatigue:12,legacy:0,
@@ -46,6 +48,8 @@ export function createDefaultState(): CareerState {
     ],
     prospects:[{id:'p1',name:'Elijah Knox',position:'SF',age:17,overall:71,potential:95,projection:'5-star',personality:'Quiet competitor',background:'Explosive two-way wing from Detroit.',status:'High School',height:"6'7\"",weight:205,school:'Lakeside Academy',rank:8,draftYear:2026,source:'Companion'}],
     scheduleGames:NBA_SCHEDULE_2025_26.map(game=>({...game})),
+    phoneContacts:phone.contacts,
+    phoneMessages:phone.messages,
     milestones:[
       {id:'m1',name:'First NBA Game',achieved:false},{id:'m2',name:'First 30-Point NBA Game',achieved:false},{id:'m3',name:'First 50-Point Game',achieved:false},{id:'m4',name:'First Triple-Double',achieved:false},{id:'m5',name:'First Playoff Win',achieved:false},{id:'m6',name:'NBA Champion',achieved:false}
     ],

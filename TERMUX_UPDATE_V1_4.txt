@@ -1,4 +1,4 @@
-NBA 2K26 Career Companion Android V1.3.0
+NBA 2K26 Career Companion Android V1.4.0
 TERMUX COMMANDS — DOWNLOAD, VERIFY, AND INSTALL THE UPDATE
 
 Repository:
@@ -8,6 +8,7 @@ IMPORTANT
 
 - Do not uninstall the existing app if you want Android to preserve its local career save.
 - The replacement APK must keep package com.careercompanion.nba2k26 and the same signing identity.
+- Version 1.4 migrates existing saves automatically. Old games remain as legacy logs.
 - The native scanner does not run inside Expo Go.
 
 OPTION A — UPDATE THE SOURCE FROM GITHUB
@@ -30,24 +31,27 @@ node --experimental-strip-types scripts/verify-screen-scan.mjs
 
 node -p "require('./app.json').expo.version"
 
+node -p "require('./app.json').expo.android.versionCode"
+
 git log -1 --oneline
 
-Expected version: 1.3.0
+Expected version: 1.4.0
+Expected Android versionCode: 6
 
 OPTION B — OPEN THE FINISHED APK FROM DOWNLOADS
 
-APK_FILE="$HOME/storage/downloads/NBA2K26_Career_Companion_v1.3.0.apk"
+APK_FILE="$HOME/storage/downloads/NBA2K26_Career_Companion_v1.4.0.apk"
 
 test -f "$APK_FILE" && termux-open "$APK_FILE"
 
 If Android asks, allow Termux to install unknown apps. Choose Update, not Uninstall.
 
-WHAT V1.3 ADDS
+WHAT V1.4 ADDS
 
-- Multi-photo draft-class import plus manual prospect editing
-- Full 2025–26 NBA first-season calendar and multi-photo schedule matching
-- Magic vs. Bird, Jordan, Kobe, LeBron, Steph, and Modern Era roster browser
-- Historical season tracker for real expansions, relocations, rebrands, playoff formats, rules, lottery changes, Play-In, and NBA Cup
-- Optional NBA 2K26 MyPLAYER animation suggestions
-- Existing on-device game, player, attribute, badge, and transaction scanner
-- Existing custom adaptive/themed Android icon
+- Immersive Phone tab with Messages, Contacts, Calendar and Social shortcut
+- Fictional texts from coaches, scouts, agents, family and era-accurate NBA players
+- Manual contacts, player discovery, persistent threads and replies
+- Game logging locked to an unlogged matchup on the active MyNBA calendar
+- Calendar completion tracking with logged results and player stat lines
+- Existing V1.3 scanners, draft class, eras, rosters, history, animations and launcher icon
+

@@ -1,8 +1,10 @@
 # 2K Screen Scanner Guide
 
+In Version 1.4, a scanned box score fills statistics only. The game date, opponent and home/away status remain locked to the unlogged matchup selected from the synchronized Calendar. If the matchup is missing, import the appropriate schedule screenshot before logging the game.
+
 ## Camera button locations
 
-- **Play → Box score:** opponent/result, game importance, PTS, REB, AST, STL, BLK, TOV, shooting makes/attempts, minutes, and plus/minus.
+- **Play → Box score:** result, game importance, PTS, REB, AST, STL, BLK, TOV, shooting makes/attempts, minutes, and plus/minus. Opponent/date/home-away come from Calendar.
 - **More → Player → player card:** team, position, overall, potential, age, jersey number, height, and weight.
 - **More → Player → Player Development:** recognized attribute names and ratings. Scan one category page at a time if needed.
 - **More → Player → Badges:** recognized badge names and tier text.

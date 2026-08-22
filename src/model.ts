@@ -10,6 +10,8 @@ export type Game = {
   id: string; date: string; opponent: string; result: 'W'|'L'; pts: number; reb: number; ast: number; stl: number; blk: number;
   tov: number; fgm: number; fga: number; tpm: number; tpa: number; ftm: number; fta: number; minutes: number; plusMinus: number;
   importance: 'Regular'|'Rivalry'|'Playoff'|'Elimination'|'Finals'; xp: number;
+  scheduleGameId?: string;
+  homeAway?: 'Home'|'Away';
 };
 export type Relationship = {
   id: string; name: string; role: string; team?: string; trust: number; respect: number; friendship: number; loyalty: number;
@@ -39,6 +41,27 @@ export type ScheduleGame = {
   homeTeam: string;
   source: 'NBA 2025-26'|'2K Schedule Scan'|'Manual';
   canon: 'League Baseline'|'2K Confirmed'|'User Confirmed';
+};
+export type PhoneContactRole = 'NBA Player'|'Coach'|'Scout'|'Agent'|'Family'|'Friend'|'Trainer'|'Executive'|'Media';
+export type PhoneContact = {
+  id: string;
+  name: string;
+  role: PhoneContactRole;
+  team?: string;
+  relationshipId?: string;
+  favorite?: boolean;
+  verified?: boolean;
+};
+export type PhoneMessage = {
+  id: string;
+  contactId: string;
+  date: string;
+  body: string;
+  direction: 'Incoming'|'Outgoing';
+  read: boolean;
+  kind: 'Career'|'Check-in'|'Reply'|'System';
+  relatedGameId?: string;
+  relatedScheduleGameId?: string;
 };
 export type Milestone = { id: string; name: string; achieved: boolean; date?: string };
 export type ScreenScanRecord = {
@@ -78,6 +101,8 @@ export type CareerState = {
   worldPlayers: WorldPlayer[];
   prospects: Prospect[];
   scheduleGames: ScheduleGame[];
+  phoneContacts: PhoneContact[];
+  phoneMessages: PhoneMessage[];
   milestones: Milestone[];
   screenScans: ScreenScanRecord[];
 };

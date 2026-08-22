@@ -11,6 +11,7 @@ import {
 import { MYNBA_ERAS, rosterForTeam, teamsForEra } from '../src/eraRosters.ts';
 import { NBA_SCHEDULE_2025_26 } from '../src/nbaSchedule2025.ts';
 import { eventsForSeason, leagueRulesForSeason, teamNameForSeason, teamsForSeason } from '../src/leagueHistory.ts';
+import { pendingPlayerScheduleGames, playerScheduleGames, scheduleLocation, scheduleOpponent, scheduleProgress } from '../src/calendarSync.ts';
 
 const game = parseGameScreen(`
 FINAL
@@ -135,4 +136,19 @@ for(const era of MYNBA_ERAS){
   assert.ok(rosterForTeam(era.id,teamsForEra(era.id)[0]).length>0,`${era.label} opening roster must be populated`);
 }
 
-console.log('Screen scanner, schedule, era roster and historical timeline verification passed.');
+const connectedState={
+  player:{team:'TOR'},settings:{myNBAEra:'Modern',myNBASeasonStart:2025},
+  scheduleGames:[
+    {id:'cal-1',era:'Modern',date:'2025-10-22',awayTeam:'TOR',homeTeam:'BOS'},
+    {id:'cal-2',era:'Modern',date:'2025-10-24',awayTeam:'NYK',homeTeam:'TOR'},
+    {id:'other-team',era:'Modern',date:'2025-10-24',awayTeam:'LAL',homeTeam:'BOS'}
+  ],
+  games:[{id:'game-1',scheduleGameId:'cal-1'}]
+};
+assert.equal(playerScheduleGames(connectedState).length,2);
+assert.equal(pendingPlayerScheduleGames(connectedState).length,1);
+assert.equal(scheduleOpponent(connectedState.scheduleGames[0],'TOR'),'BOS');
+assert.equal(scheduleLocation(connectedState.scheduleGames[0],'TOR'),'Away');
+assert.deepEqual(scheduleProgress(connectedState),{total:2,logged:1,remaining:1});
+
+console.log('Screen scanner, connected calendar, era roster and historical timeline verification passed.');

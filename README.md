@@ -1,10 +1,10 @@
-# NBA 2K26 Career Companion Mobile — Version 1.3.0
+# NBA 2K26 Career Companion Mobile — Version 1.4.0
 
 A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This edition deliberately does **not** connect to VenueLab, NBA 2K26 memory, or your PC. You can enter facts manually or approve fields recognized from photos/screenshots of your console; the app generates the immersive career world around them.
 
 ## Included in V1
 
-- Touch-first Home / Career / Play / Social / More interface
+- Touch-first Home / Career / Play / Calendar / Phone / More interface
 - Persistent offline local save using Expo SQLite key-value storage
 - Shared save format between Android and iOS
 - Randomized prospect creation
@@ -15,6 +15,10 @@ A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This ed
 - Multi-photo draft-class import with a review step and complete manual prospect editing
 - Schedule/calendar tab with the full 1,230-game 2025–26 regular-season baseline
 - Multi-photo MyNBA schedule matching with era-specific 2K Confirmed overrides
+- Calendar-required game logging: every new NBA game is attached to one unlogged matchup, date and home/away slot
+- Immersive in-app phone with messages, contacts, a synchronized game calendar and Social shortcut
+- Fictional career texts from coaches, scouts, agents, family, trainers, executives, media and era-accurate NBA roster contacts
+- Manual contact creation, era-player discovery, reply choices and relationship-aware conversations
 - All six NBA 2K26 MyNBA Era starts with historically matched teams and roster browsing
 - Season-aware historical changes for real expansions, relocations, rebrands, league structure and major rules through 2025–26
 - Optional MyPLAYER animation suggestions using real NBA 2K26 package names and saved build ratings
@@ -66,7 +70,7 @@ The screen scanner contains a native OCR module and is not available inside Expo
 
 The included `eas.json` has build profiles for mobile packaging.
 
-The repository also includes a GitHub Actions workflow that builds a release APK after a push to `main` or a manual workflow dispatch. Artifact and APK names are read from `app.json`; this release produces `NBA2K26-Career-Companion-v1.3.0-APK`.
+The repository also includes a GitHub Actions workflow that builds a release APK after a push to `main` or a manual workflow dispatch. Artifact and APK names are read from `app.json`; this release produces `NBA2K26-Career-Companion-v1.4.0-APK`.
 
 Android APK:
 
@@ -119,3 +123,11 @@ Version 1.3 adds a dedicated draft-class workflow, calendar, era rosters and opt
 - **More → Animations** recommends real NBA 2K26 jump-shot bases, dribble styles, layup packages, signature dunks, pass styles and motion styles from the saved player build. These are optional immersion suggestions, never progression requirements.
 
 Historical roster baselines reflect the real start season. NBA 2K26 may replace particular retired players with generic players when likeness rights are unavailable. The built-in historical-change timeline ends at the real 2025–26 season; later fictional MyNBA changes remain driven by the user's 2K save, schedule scans and confirmed transactions.
+
+## Version 1.4 — Phone & Connected Calendar
+
+Version 1.4 adds an immersive **Phone** tab. Its home screen includes Messages, Contacts, the career calendar and a Social shortcut. Coaches, scouts, agents, family, trainers, executives, media and era-roster NBA players can send generated story texts after draft decisions, development checkpoints, games, transactions and season changes. Users can add any universe contact, discover a player from the selected MyNBA Era roster, open persistent threads and send free-form or quick replies.
+
+All phone conversations are explicitly fictional companion simulation—not real messages or a connection to any person, console account or 2K server.
+
+Game logging is now calendar-connected. A new NBA game can only be recorded by selecting an unlogged matchup from the active team's imported/built-in schedule. The calendar supplies the date, opponent and home/away status, prevents duplicate logs, and displays the result and player line on the completed matchup. Existing game history from older versions remains available as legacy logs.

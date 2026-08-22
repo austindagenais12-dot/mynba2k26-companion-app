@@ -2,6 +2,8 @@ import { CareerState, DynamicEvent, Game, Relationship, Sponsor, SocialPost, New
 import type { ScannedAttribute, ScannedBadge, ScannedPlayerField, ScannedProspect, ScannedScheduleGame, ScannedTransaction } from './screenScan';
 import { NBA_SCHEDULE_2025_26 } from './nbaSchedule2025';
 import { clampSeasonForEra, ERA_START_YEARS, eventsForSeason, seasonLabel } from './leagueHistory';
+import { scheduleLocation, scheduleOpponent } from './calendarSync';
+import { addPhoneCareerEvent } from './phone';
 
 const routes = ['NCAA College','JUCO → NCAA','Overtime Elite','NBL Next Stars','European Pro','International Academy → European Pro'];
 const schools = ['Michigan State','Providence','Villanova','Arizona','UCLA','Baylor','Virginia Tech','Creighton','Dayton'];
@@ -70,7 +72,7 @@ function applyProfileFields(s:CareerState,input:PlayerProfileInput){
 
 export function initializeCareerProfile(state:CareerState,input:PlayerProfileInput):CareerState {
   const s=clone(state); const oldName=s.player.name; const oldSchool=s.player.schoolOrClub;
-  applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(4,s.version||1);
+  applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(5,s.version||1);
   // Replace only the starter placeholder copy. Existing career history is preserved for upgraded saves.
   if(s.history.length===1 && s.history[0]?.title==='Career begins'){
     s.history[0].body=`${s.player.name}'s basketball story begins in ${s.player.hometown}.`;
@@ -86,7 +88,7 @@ export function initializeCareerProfile(state:CareerState,input:PlayerProfileInp
 }
 
 export function updatePlayerProfile(state:CareerState,input:PlayerProfileInput):CareerState {
-  const s=clone(state); const oldName=s.player.name; applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(4,s.version||1); calculateOverall(s);
+  const s=clone(state); const oldName=s.player.name; applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(5,s.version||1); calculateOverall(s);
   pushHistory(s,'Player profile updated',`${oldName} is now listed as ${s.player.name}, ${s.player.position}, #${s.player.jersey}.`,'Career','Personal','User Confirmed');
   notify(s,'✏️','Profile updated',`${s.player.name} • ${s.player.height} • ${s.player.weight} lbs`);
   return s;
@@ -138,6 +140,7 @@ export function simulatePreNBASegment(state:CareerState):CareerState {
   social(s,`${s.player.name} is averaging ${ppg} points through the latest stretch. Current outlook: ${stock}.`,'Draft');
   if(Math.random()<0.65)s.events.unshift(generateEvent(s,'Pre-NBA'));
   if(s.player.overall>=72 && s.sponsors.length===0) s.sponsors.push(generateSponsorOffer(s,true));
+  addPhoneCareerEvent(s,'PreNBAProgress');
   s.player.phase='Season';
   return s;
 }
@@ -147,6 +150,7 @@ export function declareForDraft(state:CareerState):CareerState {
   pushHistory(s,'Declared for NBA Draft',`${s.player.name} declared with a ${s.player.draftProjection} projection and ${s.player.overall} overall.`,'Draft','Career','User Confirmed');
   news(s,`${s.player.name} declares for NBA Draft`,`The ${s.player.schoolOrClub} prospect will now let NBA 2K26 MyNBA determine where his career begins.`,'National','User Confirmed');
   notify(s,'🎓','Draft handoff ready','Run the draft inside NBA 2K26, then enter the result here.');
+  addPhoneCareerEvent(s,'DraftDeclared');
   return s;
 }
 
@@ -158,6 +162,7 @@ export function confirmDraftResult(state:CareerState,team:string,pickNo:number):
   notify(s,'🎉','Welcome to the NBA',`${s.player.team} • Pick #${pickNo}`);
   s.relationships.push({id:id('r'),name:'NBA Head Coach',role:'Coach',team:s.player.team,trust:55,respect:58,friendship:25,loyalty:45,rivalry:0,resentment:0,influence:95,closeness:32,status:'New Relationship',memories:['Met after draft night.']});
   s.storylines.unshift({id:id('st'),title:'The Rookie Year',arcType:'Career Chapter',status:'Active',heat:40,summary:`Can ${s.player.name} earn a real role in ${s.player.team}?`,participants:[s.player.name,s.player.team],started:s.player.currentDate});
+  addPhoneCareerEvent(s,'Drafted');
   return s;
 }
 
@@ -168,8 +173,17 @@ export function gameXP(g:Omit<Game,'id'|'date'|'xp'>):number {
   return Math.max(250,Math.round(xp*mult));
 }
 
-export function logGame(state:CareerState,input:Omit<Game,'id'|'date'|'xp'>):CareerState {
-  const s=clone(state); const xp=gameXP(input); const g:Game={...input,id:id('g'),date:s.player.currentDate,xp}; s.games.unshift(g); s.player.xp+=xp; s.player.fatigue=clamp(s.player.fatigue+Math.round(g.minutes/7)); s.player.morale=clamp(s.player.morale+(g.result==='W'?2:-2));
+export type ScheduledGameLogInput=Omit<Game,'id'|'date'|'xp'|'opponent'|'homeAway'> & {scheduleGameId:string};
+
+export function logGame(state:CareerState,input:ScheduledGameLogInput):CareerState {
+  const schedule=state.scheduleGames.find(game=>game.id===input.scheduleGameId);
+  const team=state.player.team.toUpperCase();
+  if(!schedule||schedule.era!==state.settings.myNBAEra||![schedule.awayTeam,schedule.homeTeam].includes(team)||state.games.some(game=>game.scheduleGameId===schedule.id))return state;
+  const s=clone(state);const matchedSchedule=s.scheduleGames.find(game=>game.id===input.scheduleGameId)!;
+  s.player.currentDate=matchedSchedule.date;
+  const opponent=scheduleOpponent(matchedSchedule,team);const homeAway=scheduleLocation(matchedSchedule,team);
+  const scoredInput={...input,opponent,homeAway};const xp=gameXP(scoredInput);
+  const g:Game={...scoredInput,id:id('g'),date:matchedSchedule.date,xp};s.games.unshift(g);s.player.xp+=xp;s.player.fatigue=clamp(s.player.fatigue+Math.round(g.minutes/7));s.player.morale=clamp(s.player.morale+(g.result==='W'?2:-2));
   const followerGain=Math.max(80,Math.round(g.pts*90+g.ast*60+(g.importance==='Playoff'?5000:0))); s.player.followers+=followerGain;
   if(g.pts>=30)s.player.marketability=clamp(s.player.marketability+2); if(g.pts>=40)s.player.legacy+=1;
   pushHistory(s,`${g.result} vs ${g.opponent}`,`${g.pts} PTS • ${g.reb} REB • ${g.ast} AST • ${g.stl} STL • +${xp.toLocaleString()} XP`,'Game',g.importance==='Regular'?'Personal':'National','2K Confirmed');
@@ -178,6 +192,7 @@ export function logGame(state:CareerState,input:Omit<Game,'id'|'date'|'xp'>):Car
   if(g.importance!=='Regular') news(s,`${s.player.name} delivers in a ${g.importance.toLowerCase()} game`,`The ${s.player.team} guard finished with ${g.pts} points and ${g.ast} assists.`,'National','2K Confirmed');
   s.sponsors.forEach(sp=>{if(sp.status==='Active')sp.progress=clamp(sp.progress+(g.pts>=20?6:3),0,sp.target)});
   updateMilestones(s,g); updateStorylines(s,g); maybeDynamicEvent(s,g); maybeSponsor(s,g); updateRelationshipsAfterGame(s,g);
+  addPhoneCareerEvent(s,'GameLogged',{game:g});
   notify(s,'🏀','Game processed',`${g.pts}/${g.reb}/${g.ast} • +${xp.toLocaleString()} XP`);
   return s;
 }
@@ -242,7 +257,7 @@ export function toggleLike(state:CareerState,postId:string):CareerState {const s
 
 export function manualTransaction(state:CareerState,type:string,player:string,fromTeam:string,toTeam:string):CareerState {
   const s=clone(state);const tx:Transaction={id:id('tx'),date:s.player.currentDate,type,player,fromTeam:fromTeam.toUpperCase(),toTeam:toTeam.toUpperCase(),canon:'2K Confirmed'};s.transactions.unshift(tx);
-  if(player.trim().toLowerCase()===s.player.name.trim().toLowerCase()){const old=s.player.team;s.player.team=toTeam.toUpperCase();pushHistory(s,`${type}: ${old} → ${s.player.team}`,`${s.player.name} moved from ${old} to ${s.player.team} inside NBA 2K26.`,'Transaction','Career','2K Confirmed');social(s,`BREAKING: ${s.player.name} is headed from ${old} to ${s.player.team}.`,'Breaking','2K Confirmed');s.relationships.forEach(r=>{if(r.role==='Coach')r.status='Former Coach'});notify(s,'🚨','Team changed',`${old} → ${s.player.team}`)} else {news(s,`${player}: ${fromTeam} → ${toTeam}`,`${type} confirmed in your MyNBA universe.`,'Background','2K Confirmed');}
+  if(player.trim().toLowerCase()===s.player.name.trim().toLowerCase()){const old=s.player.team;s.player.team=toTeam.toUpperCase();pushHistory(s,`${type}: ${old} → ${s.player.team}`,`${s.player.name} moved from ${old} to ${s.player.team} inside NBA 2K26.`,'Transaction','Career','2K Confirmed');social(s,`BREAKING: ${s.player.name} is headed from ${old} to ${s.player.team}.`,'Breaking','2K Confirmed');s.relationships.forEach(r=>{if(r.role==='Coach')r.status='Former Coach'});notify(s,'🚨','Team changed',`${old} → ${s.player.team}`);addPhoneCareerEvent(s,'TeamChanged',{oldTeam:old,newTeam:s.player.team})} else {news(s,`${player}: ${fromTeam} → ${toTeam}`,`${type} confirmed in your MyNBA universe.`,'Background','2K Confirmed');}
   return s;
 }
 
@@ -341,9 +356,10 @@ export function applyScannedSchedule(state:CareerState,teamCode:string,updates:S
   const s=clone(state);const team=teamCode.toUpperCase();let applied=0;
   updates.forEach(update=>{
     const opponent=update.opponent.toUpperCase();if(!team||!opponent||team===opponent)return;
+    const existing=s.scheduleGames.find(game=>game.era===s.settings.myNBAEra&&game.date===update.date&&[game.awayTeam,game.homeTeam].includes(team));
     s.scheduleGames=s.scheduleGames.filter(game=>game.era!==s.settings.myNBAEra||game.date!==update.date||(![game.awayTeam,game.homeTeam].includes(team)&&![game.awayTeam,game.homeTeam].includes(opponent)));
     const awayTeam=update.location==='Away'?team:opponent;const homeTeam=update.location==='Home'?team:opponent;
-    s.scheduleGames.push({id:id('schedule'),era:s.settings.myNBAEra,date:update.date,awayTeam,homeTeam,source:'2K Schedule Scan',canon:'2K Confirmed'});applied+=1;
+    s.scheduleGames.push({id:existing?.id||id('schedule'),era:s.settings.myNBAEra,date:update.date,awayTeam,homeTeam,source:'2K Schedule Scan',canon:'2K Confirmed'});applied+=1;
   });
   s.scheduleGames.sort((a,b)=>a.date.localeCompare(b.date)||a.awayTeam.localeCompare(b.awayTeam));
   if(applied){const summary=`Matched ${applied} reviewed ${team} schedule game${applied===1?'':'s'} from NBA 2K26.`;recordScreenScan(s,'Schedule',applied,summary);pushHistory(s,'2K schedule matched',summary,'Schedule','League','2K Confirmed')}
@@ -351,7 +367,13 @@ export function applyScannedSchedule(state:CareerState,teamCode:string,updates:S
 }
 
 export function resetFirstSeasonSchedule(state:CareerState):CareerState{
-  const s=clone(state);s.scheduleGames=[...s.scheduleGames.filter(game=>game.era!=='Modern'),...NBA_SCHEDULE_2025_26.map(game=>({...game}))].sort((a,b)=>a.date.localeCompare(b.date));
+  const s=clone(state);const currentModern=s.scheduleGames.filter(game=>game.era==='Modern');
+  const restored=NBA_SCHEDULE_2025_26.map(game=>{
+    const exact=currentModern.find(item=>item.date===game.date&&item.awayTeam===game.awayTeam&&item.homeTeam===game.homeTeam);
+    const playerDate=currentModern.find(item=>item.date===game.date&&[item.awayTeam,item.homeTeam].includes(s.player.team)&&[game.awayTeam,game.homeTeam].includes(s.player.team));
+    return {...game,id:exact?.id||playerDate?.id||game.id};
+  });
+  s.scheduleGames=[...s.scheduleGames.filter(game=>game.era!=='Modern'),...restored].sort((a,b)=>a.date.localeCompare(b.date));
   pushHistory(s,'First-season calendar reset','Restored the official 2025–26 NBA regular-season baseline.','Schedule','League','User Confirmed');return s;
 }
 
@@ -382,6 +404,7 @@ export function advanceSeason(state:CareerState):CareerState {
   const decline=s.player.age>=33?Math.random()<0.55:s.player.age>=30?Math.random()<0.22:false;if(decline){s.attributes.filter(a=>['Speed','Agility','Vertical','Stamina'].includes(a.name)).forEach(a=>a.rating=clamp(a.rating-1,30,a.cap));calculateOverall(s)}
   pushHistory(s,`Season ${s.player.seasonYear} begins`,`A new chapter begins at age ${s.player.age}.`,'Career','Career','User Confirmed');
   s.worldPlayers.forEach(w=>{w.age++;if(w.age<28&&Math.random()<.5)w.overall=clamp(w.overall+1,40,99);if(w.age>32&&Math.random()<.45)w.overall=clamp(w.overall-1,40,99)});
+  addPhoneCareerEvent(s,'SeasonAdvanced');
   return s;
 }
 
