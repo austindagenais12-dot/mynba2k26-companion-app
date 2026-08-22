@@ -44,15 +44,19 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
+      - name: Read app version
+        id: app
+        run: echo "version=$(node -p \"require('./app.json').expo.version\")" >> "$GITHUB_OUTPUT"
+
       - name: Name APK
         run: |
           mkdir -p output
-          cp android/app/build/outputs/apk/release/app-release.apk output/NBA2K26_Career_Companion_v1.2.1.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "output/NBA2K26_Career_Companion_v${{ steps.app.outputs.version }}.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NBA2K26-Career-Companion-v1.2.1-APK
-          path: output/NBA2K26_Career_Companion_v1.2.1.apk
+          name: NBA2K26-Career-Companion-v${{ steps.app.outputs.version }}-APK
+          path: output/NBA2K26_Career_Companion_v${{ steps.app.outputs.version }}.apk
           if-no-files-found: error
           retention-days: 7
