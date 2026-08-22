@@ -2,10 +2,15 @@ import assert from 'node:assert/strict';
 import {
   parseAttributeScreen,
   parseBadgeScreen,
+  parseDraftClass,
   parseGameScreen,
   parsePlayerOverview,
+  parseScheduleScreens,
   parseTransactionLog
 } from '../src/screenScan.ts';
+import { MYNBA_ERAS, rosterForTeam, teamsForEra } from '../src/eraRosters.ts';
+import { NBA_SCHEDULE_2025_26 } from '../src/nbaSchedule2025.ts';
+import { eventsForSeason, leagueRulesForSeason, teamNameForSeason, teamsForSeason } from '../src/leagueHistory.ts';
 
 const game = parseGameScreen(`
 FINAL
@@ -91,4 +96,43 @@ assert.deepEqual(
   ]
 );
 
-console.log('Screen scanner parser verification passed.');
+const prospects=parseDraftClass(`
+DRAFT CLASS  NAME POS AGE OVR POT
+1 Cooper Flagg SF 18 78 94 TOP 5
+2 Dylan Harper PG 19 76 92 LOTTERY
+`);
+assert.equal(prospects.length,2);
+assert.equal(prospects[0].name,'Cooper Flagg');
+assert.equal(prospects[0].rank,1);
+assert.equal(prospects[0].potential,94);
+
+const schedule=parseScheduleScreens(`
+OCT 22 @ BOS
+OCT 24 VS NYK
+NOV 1 AWAY LAL
+`,{teamCode:'TOR',seasonStartYear:2025,teamCodes:['TOR','BOS','NYK','LAL']});
+assert.deepEqual(schedule.map(game=>[game.date,game.opponent,game.location]),[
+  ['2025-10-22','BOS','Away'],
+  ['2025-10-24','NYK','Home'],
+  ['2025-11-01','LAL','Away']
+]);
+
+assert.equal(NBA_SCHEDULE_2025_26.length,1230);
+for(const team of teamsForSeason(2025)){
+  assert.equal(NBA_SCHEDULE_2025_26.filter(game=>game.awayTeam===team||game.homeTeam===team).length,82,`${team} schedule must contain 82 games`);
+}
+assert.equal(teamsForSeason(1983).length,23);
+assert.equal(teamsForSeason(1988).length,25);
+assert.equal(teamsForSeason(1989).length,27);
+assert.equal(teamsForSeason(1995).length,29);
+assert.equal(teamsForSeason(2004).length,30);
+assert.equal(teamNameForSeason('CHA',2004),'Charlotte Bobcats');
+assert.equal(teamNameForSeason('CHA',2014),'Charlotte Hornets');
+assert.ok(eventsForSeason(2008).some(event=>event.title.includes('SuperSonics')));
+assert.ok(leagueRulesForSeason(2001).some(rule=>rule.label==='Backcourt count'&&rule.value==='8 seconds'));
+for(const era of MYNBA_ERAS){
+  assert.ok(teamsForEra(era.id).length>=23,`${era.label} must include its opening teams`);
+  assert.ok(rosterForTeam(era.id,teamsForEra(era.id)[0]).length>0,`${era.label} opening roster must be populated`);
+}
+
+console.log('Screen scanner, schedule, era roster and historical timeline verification passed.');
