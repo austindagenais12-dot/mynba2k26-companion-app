@@ -33,6 +33,29 @@ export type ScannedTransaction = {
   sourceLine: string;
 };
 
+export type ScannedProspect = {
+  name: string;
+  position: string;
+  age?: number;
+  overall?: number;
+  potential?: number;
+  projection?: string;
+  height?: string;
+  weight?: number;
+  school?: string;
+  rank?: number;
+  confidence: ScanConfidence;
+  sourceLine: string;
+};
+
+export type ScannedScheduleGame = {
+  date: string;
+  opponent: string;
+  location: 'Home'|'Away';
+  confidence: ScanConfidence;
+  sourceLine: string;
+};
+
 export type ScannedPlayerFieldKey =
   | 'team' | 'position' | 'overall' | 'potential' | 'age'
   | 'jersey' | 'height' | 'weight';
@@ -43,11 +66,11 @@ export type ScannedPlayerField = {
   confidence: ScanConfidence;
 };
 
-const NBA_TEAMS: Record<string, string[]> = {
+export const NBA_TEAMS: Record<string, string[]> = {
   ATL: ['ATL', 'ATLANTA', 'ATLANTA HAWKS', 'HAWKS'],
   BOS: ['BOS', 'BOSTON', 'BOSTON CELTICS', 'CELTICS'],
-  BKN: ['BKN', 'BROOKLYN', 'BROOKLYN NETS', 'NETS'],
-  CHA: ['CHA', 'CHARLOTTE', 'CHARLOTTE HORNETS', 'HORNETS'],
+  BKN: ['BKN', 'BRK', 'BROOKLYN', 'BROOKLYN NETS', 'NETS'],
+  CHA: ['CHA', 'CHO', 'CHARLOTTE', 'CHARLOTTE HORNETS', 'CHARLOTTE BOBCATS', 'HORNETS', 'BOBCATS'],
   CHI: ['CHI', 'CHICAGO', 'CHICAGO BULLS', 'BULLS'],
   CLE: ['CLE', 'CLEVELAND', 'CLEVELAND CAVALIERS', 'CAVALIERS', 'CAVS'],
   DAL: ['DAL', 'DALLAS', 'DALLAS MAVERICKS', 'MAVERICKS', 'MAVS'],
@@ -73,7 +96,15 @@ const NBA_TEAMS: Record<string, string[]> = {
   SAS: ['SAS', 'SAN ANTONIO', 'SAN ANTONIO SPURS', 'SPURS'],
   TOR: ['TOR', 'TORONTO', 'TORONTO RAPTORS', 'RAPTORS'],
   UTA: ['UTA', 'UTAH', 'UTAH JAZZ', 'JAZZ'],
-  WAS: ['WAS', 'WASHINGTON', 'WASHINGTON WIZARDS', 'WIZARDS']
+  WAS: ['WAS', 'WASHINGTON', 'WASHINGTON WIZARDS', 'WIZARDS'],
+  KCK: ['KCK','KANSAS CITY','KANSAS CITY KINGS'],
+  NJN: ['NJN','NEW JERSEY','NEW JERSEY NETS'],
+  SDC: ['SDC','SAN DIEGO','SAN DIEGO CLIPPERS'],
+  SEA: ['SEA','SEATTLE','SEATTLE SUPERSONICS','SUPERSONICS','SONICS'],
+  WSB: ['WSB','WASHINGTON BULLETS','BULLETS'],
+  CHH: ['CHH','CHARLOTTE HORNETS','HORNETS'],
+  NOH: ['NOH','NEW ORLEANS HORNETS','HORNETS'],
+  PHO: ['PHO','PHOENIX','PHOENIX SUNS','SUNS']
 };
 
 const ATTRIBUTE_ALIASES: Record<string, string[]> = {
@@ -558,6 +589,86 @@ export function parsePlayerOverview(rawText: string, teamCodes?: string[]): Scan
   const teams = teamMatches(allText, teamCodes);
   if (teams.length) fields.push({ key: 'team', value: teams[0].code, confidence: 'Medium' });
   return dedupeBy(fields, field => field.key);
+}
+
+function titleCaseName(value: string): string {
+  const cleaned=value.replace(/^\s*(?:#\s*)?\d{1,3}[.)-]?\s*/,'').replace(/\b(?:PLAYER|PROSPECT|NAME)\b/gi,' ').replace(/\s+/g,' ').trim();
+  if(!cleaned)return '';
+  if(cleaned!==cleaned.toUpperCase())return cleaned;
+  return cleaned.toLowerCase().replace(/(^|[\s'-])([a-z])/g,(_,lead,letter)=>`${lead}${letter.toUpperCase()}`);
+}
+
+function plausibleProspectName(value:string):boolean{
+  const words=value.split(/\s+/).filter(Boolean);
+  return words.length>=2&&words.length<=5&&value.length>=5&&value.length<=50&&!/\b(?:DRAFT|CLASS|POSITION|OVERALL|POTENTIAL|SCOUTING|ROUND)\b/i.test(value);
+}
+
+export function parseDraftClass(rawText:string):ScannedProspect[]{
+  const lines=linesFrom(rawText);const output:ScannedProspect[]=[];
+  for(let index=0;index<lines.length;index+=1){
+    const line=lines[index];
+    if(/\b(?:NAME|POS(?:ITION)?|OVR|POT(?:ENTIAL)?)\b/i.test(line)&&!/^\s*(?:#\s*)?\d/.test(line))continue;
+    const combined=[line,lines[index+1]||''].join(' ').trim();
+    const direct=/^(.*?)\b(PG|SG|SF|PF|C)\b(.*)$/i.exec(line)||/^(.*?)\b(PG|SG|SF|PF|C)\b(.*)$/i.exec(combined);
+    if(!direct)continue;
+    const name=titleCaseName(direct[1]);if(!plausibleProspectName(name))continue;
+    const position=upper(direct[2]);const tail=direct[3];
+    const heightMatch=/\b([5-7])\s*['′-]\s*([0-9]{1,2})\s*(?:["″]|\b)/.exec(tail);
+    const height=heightMatch&&Number(heightMatch[2])<=11?`${heightMatch[1]}'${heightMatch[2]}"`:undefined;
+    const values=numericTokens(tail);
+    const age=values.find(value=>value>=17&&value<=25);
+    const weight=values.find(value=>value>=150&&value<=350);
+    const ratings=values.filter(value=>value>=40&&value<=99&&value!==age);
+    const overall=ratings[0]!==undefined?Math.round(ratings[0]):undefined;
+    const potential=ratings[1]!==undefined?Math.round(ratings[1]):undefined;
+    const rankMatch=/^\s*(?:#\s*)?(\d{1,3})[.)-]?\s+/.exec(direct[1]);
+    const rank=rankMatch?Number(rankMatch[1]):undefined;
+    const projectionMatch=/\b(TOP\s*5|LOTTERY|MID\s*1ST|LATE\s*1ST|1ST\s*ROUND|2ND\s*ROUND|UNDRAFTED|EARLY\s*2ND|LATE\s*2ND)\b/i.exec(combined);
+    const projection=projectionMatch?projectionMatch[1].replace(/\s+/g,' ').toUpperCase():undefined;
+    const schoolMatch=/\b(?:SCHOOL|FROM)\s*[: -]\s*([A-Za-z][A-Za-z .&'-]{2,35})/i.exec(combined);
+    const school=schoolMatch?.[1]?.trim();
+    if(overall===undefined&&potential===undefined&&rank===undefined)continue;
+    output.push({name,position,age,overall,potential,projection,height,weight,school,rank,confidence:overall!==undefined&&potential!==undefined?'High':'Medium',sourceLine:line});
+  }
+  return dedupeBy(output,item=>compact(item.name));
+}
+
+const MONTHS:Record<string,number>={JAN:1,JANUARY:1,FEB:2,FEBRUARY:2,MAR:3,MARCH:3,APR:4,APRIL:4,MAY:5,JUN:6,JUNE:6,JUL:7,JULY:7,AUG:8,AUGUST:8,SEP:9,SEPT:9,SEPTEMBER:9,OCT:10,OCTOBER:10,NOV:11,NOVEMBER:11,DEC:12,DECEMBER:12};
+
+function scheduleDateFromLine(line:string,seasonStartYear:number):string|null{
+  const text=upper(line);
+  const word=/\b(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:T(?:EMBER)?)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)\s+([0-3]?[0-9])(?:,?\s+(20\d{2}))?\b/.exec(text);
+  let month:number,day:number,year:number;
+  if(word){month=MONTHS[word[1]];day=Number(word[2]);year=word[3]?Number(word[3]):month>=9?seasonStartYear:seasonStartYear+1;}
+  else{
+    const numeric=/\b(0?[1-9]|1[0-2])[/.\-](0?[1-9]|[12][0-9]|3[01])(?:[/.\-](20\d{2}|\d{2}))?\b/.exec(text);if(!numeric)return null;
+    month=Number(numeric[1]);day=Number(numeric[2]);year=numeric[3]?(Number(numeric[3])<100?2000+Number(numeric[3]):Number(numeric[3])):month>=9?seasonStartYear:seasonStartYear+1;
+  }
+  const date=new Date(Date.UTC(year,month-1,day));if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return null;
+  return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+function aliasPattern(code:string):string{
+  return [...(NBA_TEAMS[code]||[code])].sort((a,b)=>b.length-a.length).map(alias=>escapeRegex(upper(alias)).replace(/\\ /g,'\\s+')).join('|');
+}
+
+export function parseScheduleScreens(rawText:string,context:{teamCode:string;seasonStartYear?:number;teamCodes?:string[]}):ScannedScheduleGame[]{
+  const lines=linesFrom(rawText);const teamCode=upper(context.teamCode);const seasonStartYear=context.seasonStartYear??2025;const output:ScannedScheduleGame[]=[];
+  for(let index=0;index<lines.length;index+=1){
+    const date=scheduleDateFromLine(lines[index],seasonStartYear);if(!date)continue;
+    const neighborhood=[lines[index]];
+    for(let next=index+1;next<Math.min(lines.length,index+3);next+=1){if(scheduleDateFromLine(lines[next],seasonStartYear))break;neighborhood.push(lines[next]);}
+    if(index>0&&!scheduleDateFromLine(lines[index-1],seasonStartYear))neighborhood.unshift(lines[index-1]);
+    const candidate=neighborhood.join(' ');const matches=teamMatches(candidate,context.teamCodes).filter(match=>match.code!==teamCode);const opponent=matches[0]?.code;if(!opponent)continue;
+    const rawUpper=upper(candidate);const opponentPattern=aliasPattern(opponent);const ownPattern=aliasPattern(teamCode);
+    let location:'Home'|'Away'='Home';let hasMarker=false;
+    if(new RegExp(`(?:@|\\bAT\\b)\\s*(?:${opponentPattern})`).test(rawUpper)){location='Away';hasMarker=true;}
+    else if(new RegExp(`(?:@|\\bAT\\b)\\s*(?:${ownPattern})`).test(rawUpper)){location='Home';hasMarker=true;}
+    else if(new RegExp(`\\b(?:VS|VERSUS|HOME)\\b[ .:-]*(?:${opponentPattern})`).test(rawUpper)){location='Home';hasMarker=true;}
+    else if(/\bAWAY\b/.test(rawUpper)){location='Away';hasMarker=true;}
+    output.push({date,opponent,location,confidence:hasMarker?'High':'Medium',sourceLine:neighborhood.join(' / ')});
+  }
+  return dedupeBy(output,item=>`${item.date}:${item.opponent}:${item.location}`);
 }
 
 export function humanizeScanKey(key: GameScanKey | ScannedPlayerFieldKey): string {
