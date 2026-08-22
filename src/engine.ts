@@ -1,5 +1,7 @@
-import { CareerState, DynamicEvent, Game, Relationship, Sponsor, SocialPost, NewsItem, HistoryItem, Storyline, Transaction } from './model';
-import type { ScannedAttribute, ScannedBadge, ScannedPlayerField, ScannedTransaction } from './screenScan';
+import { CareerState, DynamicEvent, Game, Relationship, Sponsor, SocialPost, NewsItem, HistoryItem, Storyline, Transaction, Prospect, MyNBAEra } from './model';
+import type { ScannedAttribute, ScannedBadge, ScannedPlayerField, ScannedProspect, ScannedScheduleGame, ScannedTransaction } from './screenScan';
+import { NBA_SCHEDULE_2025_26 } from './nbaSchedule2025';
+import { clampSeasonForEra, ERA_START_YEARS, eventsForSeason, seasonLabel } from './leagueHistory';
 
 const routes = ['NCAA College','JUCO → NCAA','Overtime Elite','NBL Next Stars','European Pro','International Academy → European Pro'];
 const schools = ['Michigan State','Providence','Villanova','Arizona','UCLA','Baylor','Virginia Tech','Creighton','Dayton'];
@@ -68,7 +70,7 @@ function applyProfileFields(s:CareerState,input:PlayerProfileInput){
 
 export function initializeCareerProfile(state:CareerState,input:PlayerProfileInput):CareerState {
   const s=clone(state); const oldName=s.player.name; const oldSchool=s.player.schoolOrClub;
-  applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(2,s.version||1);
+  applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(4,s.version||1);
   // Replace only the starter placeholder copy. Existing career history is preserved for upgraded saves.
   if(s.history.length===1 && s.history[0]?.title==='Career begins'){
     s.history[0].body=`${s.player.name}'s basketball story begins in ${s.player.hometown}.`;
@@ -84,7 +86,7 @@ export function initializeCareerProfile(state:CareerState,input:PlayerProfileInp
 }
 
 export function updatePlayerProfile(state:CareerState,input:PlayerProfileInput):CareerState {
-  const s=clone(state); const oldName=s.player.name; applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(2,s.version||1); calculateOverall(s);
+  const s=clone(state); const oldName=s.player.name; applyProfileFields(s,input); s.settings.onboardingComplete=true; s.version=Math.max(4,s.version||1); calculateOverall(s);
   pushHistory(s,'Player profile updated',`${oldName} is now listed as ${s.player.name}, ${s.player.position}, #${s.player.jersey}.`,'Career','Personal','User Confirmed');
   notify(s,'✏️','Profile updated',`${s.player.name} • ${s.player.height} • ${s.player.weight} lbs`);
   return s;
@@ -244,7 +246,7 @@ export function manualTransaction(state:CareerState,type:string,player:string,fr
   return s;
 }
 
-function recordScreenScan(s:CareerState,target:'Player Overview'|'Game Stats'|'Attributes'|'Badges'|'Transactions',recognized:number,summary:string){
+function recordScreenScan(s:CareerState,target:'Player Overview'|'Game Stats'|'Attributes'|'Badges'|'Transactions'|'Draft Class'|'Schedule',recognized:number,summary:string){
   if(!Array.isArray(s.screenScans))s.screenScans=[];
   s.screenScans.unshift({id:id('scan'),date:s.player.currentDate||now(),target,recognized,summary});
   s.screenScans=s.screenScans.slice(0,100);
@@ -301,6 +303,58 @@ export function applyScannedTransactions(state:CareerState,updates:ScannedTransa
   return s;
 }
 
+export function upsertProspect(state:CareerState,input:Prospect):CareerState{
+  const s=clone(state);const normalized=input.name.trim().toLowerCase();const existing=s.prospects.find(item=>item.id===input.id||item.name.trim().toLowerCase()===normalized);
+  const prospect:Prospect={...input,id:existing?.id||input.id||id('prospect'),name:input.name.trim(),position:input.position.toUpperCase(),age:clamp(input.age,17,50),overall:clamp(input.overall,25,99),potential:clamp(input.potential,25,99),weight:input.weight?clamp(input.weight,120,400):undefined,source:'Manual'};
+  if(existing)Object.assign(existing,prospect);else s.prospects.push(prospect);
+  s.prospects.sort((a,b)=>(a.rank??999)-(b.rank??999)||b.potential-a.potential||a.name.localeCompare(b.name));
+  pushHistory(s,existing?'Draft prospect edited':'Draft prospect added',`${prospect.name} • ${prospect.position} • ${prospect.overall} OVR / ${prospect.potential} POT.`,'Draft','Personal','User Confirmed');
+  return s;
+}
+
+export function deleteProspect(state:CareerState,prospectId:string):CareerState{
+  const s=clone(state);const prospect=s.prospects.find(item=>item.id===prospectId);s.prospects=s.prospects.filter(item=>item.id!==prospectId);
+  if(prospect)pushHistory(s,'Draft prospect removed',`${prospect.name} was removed from the companion draft class.`,'Draft','Personal','User Confirmed');
+  return s;
+}
+
+export function applyScannedDraftClass(state:CareerState,updates:ScannedProspect[]):CareerState{
+  const s=clone(state);let applied=0;
+  updates.forEach(update=>{
+    const normalized=update.name.trim().toLowerCase();const existing=s.prospects.find(item=>item.name.trim().toLowerCase()===normalized);
+    const prospect:Prospect={
+      id:existing?.id||id('prospect'),name:update.name.trim(),position:update.position,age:update.age??existing?.age??19,
+      overall:update.overall??existing?.overall??60,potential:update.potential??existing?.potential??75,
+      projection:update.projection??existing?.projection??'Unscouted',personality:existing?.personality??'Unknown',
+      background:existing?.background??'Imported from the current NBA 2K26 draft class.',status:'Draft Class',
+      height:update.height??existing?.height,weight:update.weight??existing?.weight,school:update.school??existing?.school,
+      rank:update.rank??existing?.rank,draftYear:existing?.draftYear??2026,source:'2K Scan'
+    };
+    if(existing)Object.assign(existing,prospect);else s.prospects.push(prospect);applied+=1;
+  });
+  s.prospects.sort((a,b)=>(a.rank??999)-(b.rank??999)||b.potential-a.potential||a.name.localeCompare(b.name));
+  if(applied){const summary=`Imported or updated ${applied} reviewed draft prospect${applied===1?'':'s'}.`;recordScreenScan(s,'Draft Class',applied,summary);pushHistory(s,'2K draft class imported',summary,'Draft','League','2K Confirmed')}
+  return s;
+}
+
+export function applyScannedSchedule(state:CareerState,teamCode:string,updates:ScannedScheduleGame[]):CareerState{
+  const s=clone(state);const team=teamCode.toUpperCase();let applied=0;
+  updates.forEach(update=>{
+    const opponent=update.opponent.toUpperCase();if(!team||!opponent||team===opponent)return;
+    s.scheduleGames=s.scheduleGames.filter(game=>game.era!==s.settings.myNBAEra||game.date!==update.date||(![game.awayTeam,game.homeTeam].includes(team)&&![game.awayTeam,game.homeTeam].includes(opponent)));
+    const awayTeam=update.location==='Away'?team:opponent;const homeTeam=update.location==='Home'?team:opponent;
+    s.scheduleGames.push({id:id('schedule'),era:s.settings.myNBAEra,date:update.date,awayTeam,homeTeam,source:'2K Schedule Scan',canon:'2K Confirmed'});applied+=1;
+  });
+  s.scheduleGames.sort((a,b)=>a.date.localeCompare(b.date)||a.awayTeam.localeCompare(b.awayTeam));
+  if(applied){const summary=`Matched ${applied} reviewed ${team} schedule game${applied===1?'':'s'} from NBA 2K26.`;recordScreenScan(s,'Schedule',applied,summary);pushHistory(s,'2K schedule matched',summary,'Schedule','League','2K Confirmed')}
+  return s;
+}
+
+export function resetFirstSeasonSchedule(state:CareerState):CareerState{
+  const s=clone(state);s.scheduleGames=[...s.scheduleGames.filter(game=>game.era!=='Modern'),...NBA_SCHEDULE_2025_26.map(game=>({...game}))].sort((a,b)=>a.date.localeCompare(b.date));
+  pushHistory(s,'First-season calendar reset','Restored the official 2025–26 NBA regular-season baseline.','Schedule','League','User Confirmed');return s;
+}
+
 export function offseasonActivity(state:CareerState,activity:string):CareerState {
   const s=clone(state);let body='';
   if(activity==='Skill Training'){const candidates=s.attributes.filter(a=>a.rating<a.cap);for(let i=0;i<3;i++){const a=pick(candidates);a.rating=clamp(a.rating+1,0,a.cap)}calculateOverall(s);s.player.fatigue=clamp(s.player.fatigue+10);body='Targeted training improved three attributes.'}
@@ -315,6 +369,16 @@ export function offseasonActivity(state:CareerState,activity:string):CareerState
 
 export function advanceSeason(state:CareerState):CareerState {
   const s=clone(state);s.player.seasonYear+=1;s.player.age+=1;s.player.phase='Offseason';s.player.fatigue=clamp(s.player.fatigue-20);s.player.morale=clamp(s.player.morale+4);
+  const nextHistoricalSeason=clampSeasonForEra(s.settings.myNBAEra,s.settings.myNBASeasonStart+1);
+  if(nextHistoricalSeason!==s.settings.myNBASeasonStart){
+    s.settings.myNBASeasonStart=nextHistoricalSeason;
+    const changes=eventsForSeason(nextHistoricalSeason);
+    if(changes.length){
+      const summary=changes.map(change=>change.title).join(' • ');
+      pushHistory(s,`${seasonLabel(nextHistoricalSeason)} league changes`,summary,'League History','League','Companion Canon');
+      changes.forEach(change=>notify(s,change.category==='Expansion'?'➕':change.category==='Rules'?'📜':'🏟️',change.title,change.detail));
+    }
+  }
   const decline=s.player.age>=33?Math.random()<0.55:s.player.age>=30?Math.random()<0.22:false;if(decline){s.attributes.filter(a=>['Speed','Agility','Vertical','Stamina'].includes(a.name)).forEach(a=>a.rating=clamp(a.rating-1,30,a.cap));calculateOverall(s)}
   pushHistory(s,`Season ${s.player.seasonYear} begins`,`A new chapter begins at age ${s.player.age}.`,'Career','Career','User Confirmed');
   s.worldPlayers.forEach(w=>{w.age++;if(w.age<28&&Math.random()<.5)w.overall=clamp(w.overall+1,40,99);if(w.age>32&&Math.random()<.45)w.overall=clamp(w.overall-1,40,99)});
@@ -322,3 +386,13 @@ export function advanceSeason(state:CareerState):CareerState {
 }
 
 export function changeSetting(state:CareerState,key:string,value:any):CareerState {const s=clone(state);(s.settings as any)[key]=value;return s;}
+
+export function selectMyNBAEra(state:CareerState,era:MyNBAEra):CareerState{
+  const s=clone(state);s.settings.myNBAEra=era;s.settings.myNBASeasonStart=ERA_START_YEARS[era];
+  pushHistory(s,`${era} era selected`,`Historical league tracking begins with the ${seasonLabel(s.settings.myNBASeasonStart)} season.`,'League History','League','User Confirmed');
+  return s;
+}
+
+export function selectMyNBASeason(state:CareerState,seasonStart:number):CareerState{
+  const s=clone(state);s.settings.myNBASeasonStart=clampSeasonForEra(s.settings.myNBAEra,seasonStart);return s;
+}
