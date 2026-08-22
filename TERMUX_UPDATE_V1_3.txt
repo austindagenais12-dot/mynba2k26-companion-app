@@ -1,0 +1,53 @@
+NBA 2K26 Career Companion Android V1.3.0
+TERMUX COMMANDS — DOWNLOAD, VERIFY, AND INSTALL THE UPDATE
+
+Repository:
+https://github.com/austindagenais12-dot/mynba2k26-companion-app.git
+
+IMPORTANT
+
+- Do not uninstall the existing app if you want Android to preserve its local career save.
+- The replacement APK must keep package com.careercompanion.nba2k26 and the same signing identity.
+- The native scanner does not run inside Expo Go.
+
+OPTION A — UPDATE THE SOURCE FROM GITHUB
+
+termux-setup-storage
+
+pkg install git nodejs -y
+
+test -d "$HOME/mynba2k26-companion-app/.git" || git clone https://github.com/austindagenais12-dot/mynba2k26-companion-app.git "$HOME/mynba2k26-companion-app"
+
+cd "$HOME/mynba2k26-companion-app"
+
+git pull --ff-only origin main
+
+npm install
+
+./node_modules/.bin/tsc --noEmit
+
+node --experimental-strip-types scripts/verify-screen-scan.mjs
+
+node -p "require('./app.json').expo.version"
+
+git log -1 --oneline
+
+Expected version: 1.3.0
+
+OPTION B — OPEN THE FINISHED APK FROM DOWNLOADS
+
+APK_FILE="$HOME/storage/downloads/NBA2K26_Career_Companion_v1.3.0.apk"
+
+test -f "$APK_FILE" && termux-open "$APK_FILE"
+
+If Android asks, allow Termux to install unknown apps. Choose Update, not Uninstall.
+
+WHAT V1.3 ADDS
+
+- Multi-photo draft-class import plus manual prospect editing
+- Full 2025–26 NBA first-season calendar and multi-photo schedule matching
+- Magic vs. Bird, Jordan, Kobe, LeBron, Steph, and Modern Era roster browser
+- Historical season tracker for real expansions, relocations, rebrands, playoff formats, rules, lottery changes, Play-In, and NBA Cup
+- Optional NBA 2K26 MyPLAYER animation suggestions
+- Existing on-device game, player, attribute, badge, and transaction scanner
+- Existing custom adaptive/themed Android icon
