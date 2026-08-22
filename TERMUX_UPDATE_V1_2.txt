@@ -1,0 +1,65 @@
+NBA 2K26 Career Companion Android V1.2.1
+TERMUX COMMANDS — APPLY CAMERA SCANNER + NEW APP ICON UPDATE
+
+These commands keep the Android project files at the ROOT of this repository:
+https://github.com/austindagenais12-dot/mynba2k26-companion-app.git
+
+Before starting:
+1. Download NBA2K26_Career_Companion_Android_V1_2_CAMERA_SCAN_FLAT.zip.
+2. Leave the ZIP in Internal storage > Download.
+3. Do not uninstall the current APK if you want to preserve its local career save.
+
+COPY AND PASTE INTO TERMUX
+
+termux-setup-storage
+
+pkg install git nodejs unzip -y
+
+NBA_UPDATE_ZIP="$HOME/storage/downloads/NBA2K26_Career_Companion_Android_V1_2_CAMERA_SCAN_FLAT.zip"
+
+NBA_UPDATE_DIR="$(mktemp -d "$PREFIX/tmp/nba2k26-v1-2.XXXXXX")"
+
+unzip -q "$NBA_UPDATE_ZIP" -d "$NBA_UPDATE_DIR"
+
+test -d "$HOME/mynba2k26-companion-app/.git" || git clone https://github.com/austindagenais12-dot/mynba2k26-companion-app.git "$HOME/mynba2k26-companion-app"
+
+cd "$HOME/mynba2k26-companion-app"
+
+cp -r "$NBA_UPDATE_DIR"/. "$HOME/mynba2k26-companion-app/"
+
+npm install
+
+test -f assets/icon.png && echo "Legacy icon: OK"
+
+test -f assets/adaptive-icon.png && echo "Adaptive icon: OK"
+
+test -f assets/adaptive-icon-monochrome.png && echo "Themed icon: OK"
+
+npx expo config --type public
+
+git status --short
+
+git add .
+
+git commit -m "Add V1.2.1 camera scanner and custom Android icon"
+
+git branch -M main
+
+git push -u origin main
+
+AFTER THE PUSH
+
+1. Open Codemagic.
+2. Select mynba2k26-companion-app.
+3. Select branch main.
+4. Start a fresh Android Release build.
+5. Download the release APK from:
+   android/app/build/outputs/apk/release/
+
+IMPORTANT
+
+- This ZIP is flat on purpose. The cp command copies its CONTENTS into the repository root and does not create an extra nested project folder.
+- This update adds native camera/OCR packages and launcher resources. npm install plus a fresh native Android build are required.
+- Expo Go cannot run the scanner.
+- For an in-place Android update that preserves the local save, keep the same package and signing identity as the existing installation.
+- If git commit reports "nothing to commit," the same update is already present in the repository.

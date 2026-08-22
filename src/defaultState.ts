@@ -21,7 +21,7 @@ const badges: Badge[] = badgeNames.map(([name,category], i) => ({name,category,l
 export function createDefaultState(): CareerState {
   const today = new Date().toISOString().slice(0,10);
   return {
-    version: 2,
+    version: 3,
     player: {
       name:'Marcus Carter',position:'PG',age:17,height:"6'3\"",weight:175,hometown:'Halifax, NS',nationality:'Canada',dominantHand:'Right',highSchoolYear:'Senior',stage:'High School',route:'Undecided',schoolOrClub:'Lakeshore Prep',team:'',jersey:3,
       overall:64,potential:91,seasonYear:2026,currentDate:today,phase:'Preseason',xp:0,money:0,careerEarnings:0,followers:12800,marketability:45,morale:78,fatigue:12,legacy:0,
@@ -46,6 +46,7 @@ export function createDefaultState(): CareerState {
     prospects:[{id:'p1',name:'Elijah Knox',position:'SF',age:17,overall:71,potential:95,projection:'5-star',personality:'Quiet competitor',background:'Explosive two-way wing from Detroit.',status:'High School'}],
     milestones:[
       {id:'m1',name:'First NBA Game',achieved:false},{id:'m2',name:'First 30-Point NBA Game',achieved:false},{id:'m3',name:'First 50-Point Game',achieved:false},{id:'m4',name:'First Triple-Double',achieved:false},{id:'m5',name:'First Playoff Win',achieved:false},{id:'m6',name:'NBA Champion',achieved:false}
-    ]
+    ],
+    screenScans:[]
   };
 }

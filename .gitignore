@@ -1,0 +1,11 @@
+node_modules/
+.expo/
+android/
+dist/
+web-build/
+*.log
+*.jks
+*.keystore
+local.properties
+.DS_Store
+assets/icon-artwork-master.png

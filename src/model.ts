@@ -27,6 +27,13 @@ export type Transaction = { id: string; date: string; type: string; player: stri
 export type WorldPlayer = { id: string; name: string; team: string; position: string; age: number; overall: number; potential: number; personality: string; reputation: string; history: string[] };
 export type Prospect = { id: string; name: string; position: string; age: number; overall: number; potential: number; projection: string; personality: string; background: string; status: string };
 export type Milestone = { id: string; name: string; achieved: boolean; date?: string };
+export type ScreenScanRecord = {
+  id: string;
+  date: string;
+  target: 'Player Overview'|'Game Stats'|'Attributes'|'Badges'|'Transactions';
+  recognized: number;
+  summary: string;
+};
 
 export type CareerState = {
   version: number;
@@ -54,4 +61,5 @@ export type CareerState = {
   worldPlayers: WorldPlayer[];
   prospects: Prospect[];
   milestones: Milestone[];
+  screenScans: ScreenScanRecord[];
 };

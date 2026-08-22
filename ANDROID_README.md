@@ -17,4 +17,12 @@ Install Android Studio/SDK first, then:
     npx expo prebuild --platform android
     npx expo run:android
 
-There is no VenueLab or PC sync in this edition. All 2K events are confirmed manually in-app.
+There is no VenueLab, PC, or game-memory sync in this edition. Version 1.2 can recognize text from a camera photo or selected console screenshot, but every proposed change must be reviewed and confirmed in-app.
+
+The native OCR dependency does not run in Expo Go. Use an EAS APK or Android development build when testing camera-assisted autofill.
+
+## Apply this update from Termux
+
+Use the copy-paste commands in `TERMUX_UPDATE_V1_2.txt`. They extract the flat update ZIP, copy its contents into the existing GitHub repository root without adding another project folder, install the new native dependencies, verify the launcher artwork, and push the update for a fresh Codemagic Android Release build.
+
+Keep the installed app on the phone until the replacement APK is ready. Android can preserve the local career save when the new APK uses the same package and signing identity.

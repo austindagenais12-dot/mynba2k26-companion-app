@@ -1,6 +1,6 @@
-# NBA 2K26 Career Companion Mobile — Version 1
+# NBA 2K26 Career Companion Mobile — Version 1.2.1
 
-A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This edition deliberately does **not** connect to VenueLab, NBA 2K26 memory, or your PC. You confirm the important in-game facts manually; the app generates the immersive career world around them.
+A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This edition deliberately does **not** connect to VenueLab, NBA 2K26 memory, or your PC. You can enter facts manually or approve fields recognized from photos/screenshots of your console; the app generates the immersive career world around them.
 
 ## Included in V1
 
@@ -10,7 +10,9 @@ A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This ed
 - Randomized prospect creation
 - Compressed High School / NCAA / JUCO / OTE / NBL / European pathways
 - NBA Draft handoff: NBA 2K26 MyNBA determines your actual draft team and pick
-- Manual 2K-confirmed game logging
+- Camera/screenshot-assisted game logging with a required review step
+- On-device recognition for player overview fields, attributes, badge tiers, and transaction logs
+- Original Android launcher icon with adaptive and themed-icon artwork
 - XP and attribute upgrades with escalating costs
 - Badge tracker
 - Dynamic off-court encounters with hidden consequences
@@ -33,7 +35,7 @@ A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This ed
 
 ## Important mobile design rule
 
-NBA 2K26 remains the source of truth for basketball. The mobile app never pretends it saw your game. A game, draft result, trade, signing, award, etc. becomes **2K Confirmed** only when you enter it.
+NBA 2K26 remains the source of truth for basketball. A game, draft result, trade, signing, award, etc. becomes **2K Confirmed** only when you enter it or explicitly approve recognized fields in the scan-review screen. OCR results are never silently committed.
 
 ## Project stack
 
@@ -41,6 +43,8 @@ NBA 2K26 remains the source of truth for basketball. The mobile app never preten
 - Expo SDK 57
 - TypeScript
 - Expo SQLite key-value storage
+- Expo Image Picker for camera/gallery capture
+- On-device ML Kit text recognition on Android
 - No server and no account required by the app itself
 
 ## Development start
@@ -48,7 +52,9 @@ NBA 2K26 remains the source of truth for basketball. The mobile app never preten
 1. Install Node.js.
 2. Open this project folder in a terminal.
 3. Run `npm install`.
-4. Run `npx expo start` or create a development build.
+4. Create an Android development build or EAS build.
+
+The screen scanner contains a native OCR module and is not available inside Expo Go. The rest of the project can still be inspected there, but camera autofill requires a development/APK build.
 
 ## Standalone builds
 
@@ -85,3 +91,11 @@ This is a fan-made companion project. NBA, NBA 2K and related marks belong to th
 Version 1.1 adds a first-launch prospect setup screen and an editable player profile. You can now set your player name, position, age, height, weight, hometown, nationality, dominant hand, high-school year, starting school/academy/club, and jersey number before the career begins. Existing Version 1 saves are migrated and shown the setup screen once so the placeholder identity can be replaced without deleting career progress. Player identity can later be edited from **More → Player → Edit profile**.
 
 The **Randomize basketball profile** action now preserves your chosen identity, body information, position, school, and jersey number; it only randomizes basketball ability/upside/personality.
+
+## Version 1.2 — 2K Screen Scanner
+
+Version 1.2 adds small camera buttons beside the box score, player overview, attributes, badges, and league transactions. The user can take a TV photo or choose a direct console screenshot. Text recognition runs on the phone, then a review sheet shows current and scanned values with per-row checkboxes. Only checked rows are applied.
+
+The parser supports labeled game stats and column-style box scores, common NBA 2K attribute names, badge tiers, player OVR/POT/body fields, and multi-line trade/signing/waiver/release logs. Direct screenshots and sharp, glare-free TV photos give the best results.
+
+The Android package also includes a custom launcher icon using the companion's charcoal and coral palette. Separate foreground and monochrome assets support adaptive masks and Android 13+ themed icons.

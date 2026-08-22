@@ -1,4 +1,5 @@
 import { CareerState, DynamicEvent, Game, Relationship, Sponsor, SocialPost, NewsItem, HistoryItem, Storyline, Transaction } from './model';
+import type { ScannedAttribute, ScannedBadge, ScannedPlayerField, ScannedTransaction } from './screenScan';
 
 const routes = ['NCAA College','JUCO → NCAA','Overtime Elite','NBL Next Stars','European Pro','International Academy → European Pro'];
 const schools = ['Michigan State','Providence','Villanova','Arizona','UCLA','Baylor','Virginia Tech','Creighton','Dayton'];
@@ -240,6 +241,63 @@ export function toggleLike(state:CareerState,postId:string):CareerState {const s
 export function manualTransaction(state:CareerState,type:string,player:string,fromTeam:string,toTeam:string):CareerState {
   const s=clone(state);const tx:Transaction={id:id('tx'),date:s.player.currentDate,type,player,fromTeam:fromTeam.toUpperCase(),toTeam:toTeam.toUpperCase(),canon:'2K Confirmed'};s.transactions.unshift(tx);
   if(player.trim().toLowerCase()===s.player.name.trim().toLowerCase()){const old=s.player.team;s.player.team=toTeam.toUpperCase();pushHistory(s,`${type}: ${old} → ${s.player.team}`,`${s.player.name} moved from ${old} to ${s.player.team} inside NBA 2K26.`,'Transaction','Career','2K Confirmed');social(s,`BREAKING: ${s.player.name} is headed from ${old} to ${s.player.team}.`,'Breaking','2K Confirmed');s.relationships.forEach(r=>{if(r.role==='Coach')r.status='Former Coach'});notify(s,'🚨','Team changed',`${old} → ${s.player.team}`)} else {news(s,`${player}: ${fromTeam} → ${toTeam}`,`${type} confirmed in your MyNBA universe.`,'Background','2K Confirmed');}
+  return s;
+}
+
+function recordScreenScan(s:CareerState,target:'Player Overview'|'Game Stats'|'Attributes'|'Badges'|'Transactions',recognized:number,summary:string){
+  if(!Array.isArray(s.screenScans))s.screenScans=[];
+  s.screenScans.unshift({id:id('scan'),date:s.player.currentDate||now(),target,recognized,summary});
+  s.screenScans=s.screenScans.slice(0,100);
+  notify(s,'📷',`${target} scanned`,summary);
+}
+
+export function recordGameScreenScan(state:CareerState,recognized:number):CareerState {
+  const s=clone(state);recordScreenScan(s,'Game Stats',recognized,`Filled ${recognized} reviewed game field${recognized===1?'':'s'} from a 2K screen.`);return s;
+}
+
+export function applyScannedAttributes(state:CareerState,updates:ScannedAttribute[]):CareerState {
+  const s=clone(state);let applied=0;
+  updates.forEach(update=>{const attribute=s.attributes.find(item=>item.name===update.name);if(!attribute)return;attribute.rating=clamp(update.rating,25,99);attribute.cap=Math.max(attribute.cap,attribute.rating);applied+=1});
+  if(applied){const summary=`Updated ${applied} recognized rating${applied===1?'':'s'} after review.`;recordScreenScan(s,'Attributes',applied,summary);pushHistory(s,'2K attribute screen imported',summary,'Player','Personal','2K Confirmed')}
+  return s;
+}
+
+export function applyScannedBadges(state:CareerState,updates:ScannedBadge[]):CareerState {
+  const s=clone(state);let applied=0;
+  updates.forEach(update=>{const badge=s.badges.find(item=>item.name===update.name);if(!badge)return;badge.level=update.level;if(update.level==='Locked')badge.progress=0;applied+=1});
+  if(applied){const summary=`Updated ${applied} recognized badge tier${applied===1?'':'s'} after review.`;recordScreenScan(s,'Badges',applied,summary);pushHistory(s,'2K badge screen imported',summary,'Player','Personal','2K Confirmed')}
+  return s;
+}
+
+export function applyScannedPlayerOverview(state:CareerState,updates:ScannedPlayerField[]):CareerState {
+  let s=clone(state);let applied=0;
+  updates.forEach(update=>{
+    const value=update.value;
+    if(update.key==='team'&&typeof value==='string'&&value.trim()){
+      const nextTeam=value.trim().toUpperCase(),oldTeam=s.player.team;
+      if(oldTeam&&oldTeam!==nextTeam)s=manualTransaction(s,'Screen-detected roster move',s.player.name,oldTeam,nextTeam);else s.player.team=nextTeam;
+      applied+=1
+    }
+    else if(update.key==='position'&&typeof value==='string'&&['PG','SG','SF','PF','C'].includes(value.toUpperCase())){s.player.position=value.toUpperCase();applied+=1}
+    else if(update.key==='height'&&typeof value==='string'&&value.trim()){s.player.height=value.trim();applied+=1}
+    else if(update.key==='overall'){s.player.overall=clamp(Number(value),25,99);applied+=1}
+    else if(update.key==='potential'){s.player.potential=clamp(Number(value),25,99);applied+=1}
+    else if(update.key==='age'){s.player.age=clamp(Number(value),14,50);applied+=1}
+    else if(update.key==='jersey'){s.player.jersey=clamp(Number(value),0,99);applied+=1}
+    else if(update.key==='weight'){s.player.weight=clamp(Number(value),120,400);applied+=1}
+  });
+  if(applied){const summary=`Updated ${applied} recognized player field${applied===1?'':'s'} after review.`;recordScreenScan(s,'Player Overview',applied,summary);pushHistory(s,'2K player overview imported',summary,'Player','Personal','2K Confirmed')}
+  return s;
+}
+
+export function applyScannedTransactions(state:CareerState,updates:ScannedTransaction[]):CareerState {
+  let s=clone(state);let applied=0;
+  updates.forEach(update=>{
+    const duplicate=s.transactions.some(tx=>tx.player.trim().toLowerCase()===update.player.trim().toLowerCase()&&tx.type.trim().toLowerCase()===update.type.trim().toLowerCase()&&tx.fromTeam.toUpperCase()===update.fromTeam.toUpperCase()&&tx.toTeam.toUpperCase()===update.toTeam.toUpperCase());
+    if(duplicate)return;
+    s=manualTransaction(s,update.type,update.player,update.fromTeam,update.toTeam);applied+=1;
+  });
+  if(applied){const summary=`Imported ${applied} transaction${applied===1?'':'s'} from the reviewed 2K log.`;recordScreenScan(s,'Transactions',applied,summary)}
   return s;
 }
 

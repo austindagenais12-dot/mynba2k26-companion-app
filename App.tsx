@@ -1,18 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
   Share, StyleSheet, Switch, Text, TextInput, View
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Storage from 'expo-sqlite/kv-store';
+import * as ImagePicker from 'expo-image-picker';
+import { extractTextFromImage, isSupported as isTextExtractionSupported } from 'expo-text-extractor';
 import { createDefaultState } from './src/defaultState';
 import {
   addUserPost, advanceSeason, attributeUpgradeCost, changeSetting, chooseRoute, confirmDraftResult,
   declareForDraft, generateEvent, logGame, manualTransaction, offseasonActivity, randomizeProspect,
   resolveEvent, simulatePreNBASegment, sponsorAction, toggleLike, upgradeAttribute,
-  initializeCareerProfile, updatePlayerProfile, PlayerProfileInput
+  initializeCareerProfile, updatePlayerProfile, PlayerProfileInput,
+  applyScannedAttributes, applyScannedBadges, applyScannedPlayerOverview, applyScannedTransactions,
+  recordGameScreenScan
 } from './src/engine';
 import { CareerState, DynamicEvent, SocialPost } from './src/model';
+import {
+  GameScanKey, ScannedAttribute, ScannedBadge, ScannedGameField, ScannedPlayerField, ScannedTransaction,
+  humanizeScanKey, parseAttributeScreen, parseBadgeScreen, parseGameScreen,
+  parsePlayerOverview, parseTransactionLog
+} from './src/screenScan';
 
 const SAVE_KEY = 'nba2k26-career-companion-mobile-v1';
 const ACCENT = '#ff5a47';
@@ -30,7 +39,7 @@ const teams = ['ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GSW','HOU'
 const importances = ['Regular','Rivalry','Playoff','Elimination','Finals'] as const;
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 const fmtMoney = (n:number) => n >= 1_000_000 ? `$${(n/1_000_000).toFixed(1)}M` : `$${Math.round(n/1000)}K`;
-const pct = (n:number) => `${Math.max(0,Math.min(100,n))}%`;
+const pct = (n:number):`${number}%` => `${Math.max(0,Math.min(100,n))}%`;
 
 const positions=['PG','SG','SF','PF','C'];
 const schoolYears=['Freshman','Sophomore','Junior','Senior'];
@@ -41,7 +50,7 @@ function migrateCareerState(raw:any):CareerState {
   return {
     ...base,
     ...raw,
-    version:2,
+    version:3,
     player:{...base.player,...(raw.player||{})},
     settings:{...base.settings,...(raw.settings||{}),onboardingComplete:raw.settings?.onboardingComplete??false},
     attributes:Array.isArray(raw.attributes)?raw.attributes:base.attributes,
@@ -59,7 +68,8 @@ function migrateCareerState(raw:any):CareerState {
     transactions:Array.isArray(raw.transactions)?raw.transactions:[],
     worldPlayers:Array.isArray(raw.worldPlayers)?raw.worldPlayers:base.worldPlayers,
     prospects:Array.isArray(raw.prospects)?raw.prospects:base.prospects,
-    milestones:Array.isArray(raw.milestones)?raw.milestones:base.milestones
+    milestones:Array.isArray(raw.milestones)?raw.milestones:base.milestones,
+    screenScans:Array.isArray(raw.screenScans)?raw.screenScans:[]
   };
 }
 
@@ -82,6 +92,79 @@ function Field({label,value,onChange,keyboard='default',placeholder}:{label:stri
   return <View style={{gap:6,flex:1,minWidth:120}}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChange} keyboardType={keyboard} placeholder={placeholder} placeholderTextColor="#626b78" style={styles.input}/></View>
 }
 function Canon({value}:{value:string}) {const tone=value==='2K Confirmed'?'good':value==='Rumor'?'warn':'muted';return <Pill text={value} tone={tone}/>}
+
+type ScanReviewItem = {
+  id:string;
+  label:string;
+  value:string;
+  current?:string;
+  confidence:'High'|'Medium';
+  payload:any;
+  selected?:boolean;
+};
+type ScanReviewData = {title:string;subtitle:string;items:ScanReviewItem[];rawText:string};
+
+function CameraButton({label,onPress,disabled=false}:{label:string;onPress:()=>void;disabled?:boolean}){
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({pressed})=>[styles.cameraBtn,disabled&&{opacity:.45},pressed&&!disabled&&{opacity:.68}]}><Text style={styles.cameraIcon}>📷</Text></Pressable>;
+}
+
+function chooseScanSource(target:string):Promise<'camera'|'library'|null>{
+  return new Promise(resolve=>Alert.alert(`Scan ${target}`,'Take a clear photo of the 2K screen, or use a console screenshot already saved on this phone.',[
+    {text:'Take photo',onPress:()=>resolve('camera')},
+    {text:'Choose screenshot',onPress:()=>resolve('library')},
+    {text:'Cancel',style:'cancel',onPress:()=>resolve(null)}
+  ],{cancelable:true,onDismiss:()=>resolve(null)}));
+}
+
+function use2KScreenScanner(){
+  const [busy,setBusy]=useState(false);const [busyLabel,setBusyLabel]=useState('Reading 2K screen…');
+  const scan=async(target:string):Promise<string|null>=>{
+    if(!isTextExtractionSupported){Alert.alert('Scanner unavailable','Install an EAS or Android development build of this version. The native screen reader is not available inside Expo Go.');return null}
+    const source=await chooseScanSource(target);if(!source)return null;
+    try{
+      if(source==='camera'){
+        const existing=await ImagePicker.getCameraPermissionsAsync();
+        const permission=existing.granted?existing:await ImagePicker.requestCameraPermissionsAsync();
+        if(!permission.granted){Alert.alert('Camera permission needed','Allow camera access to photograph your NBA 2K26 screen. You can still choose an existing screenshot.');return null}
+      }
+      setBusyLabel(`Reading ${target}…`);setBusy(true);
+      const picked=source==='camera'
+        ?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:1,allowsEditing:false})
+        :await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:1,allowsEditing:false});
+      if(picked.canceled||!picked.assets?.[0]?.uri)return null;
+      const lines=await extractTextFromImage(picked.assets[0].uri);
+      const raw=lines.map(line=>line.trim()).filter(Boolean).join('\n');
+      if(!raw){Alert.alert('No text found','Move closer, avoid glare, keep the TV text sharp, and make the section you want fill most of the photo.');return null}
+      return raw;
+    }catch(error){
+      const message=error instanceof Error?error.message:'The screen could not be read.';
+      Alert.alert('Could not scan screen',`${message}\n\nTry a sharper photo or choose a direct console screenshot.`);return null;
+    }finally{setBusy(false)}
+  };
+  return {scan,busy,busyLabel};
+}
+
+function ScanBusyModal({visible,label}:{visible:boolean;label:string}){
+  return <Modal visible={visible} transparent animationType="fade"><View style={styles.busyScrim}><View style={styles.busyCard}><ActivityIndicator size="large" color={ACCENT}/><Text style={styles.cardTitle}>{label}</Text><Text style={styles.mutedSmall}>Recognition happens on this device. Nothing is applied automatically.</Text></View></View></Modal>;
+}
+
+function ScanReviewModal({review,onClose,onApply}:{review:ScanReviewData|null;onClose:()=>void;onApply:(items:ScanReviewItem[])=>void}){
+  const [draft,setDraft]=useState<ScanReviewItem[]>([]);const [showRaw,setShowRaw]=useState(false);
+  useEffect(()=>{setDraft((review?.items||[]).map(item=>({...item,selected:item.selected??true})));setShowRaw(false)},[review]);
+  if(!review)return null;
+  const selected=draft.filter(item=>item.selected);
+  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalScrim}><View style={[styles.modalSheet,{maxHeight:'92%'}]}>
+    <Row style={{justifyContent:'space-between',alignItems:'flex-start'}}><View style={{flex:1,paddingRight:12}}><Text style={styles.modalTitle}>{review.title}</Text><Text style={styles.mutedSmall}>{review.subtitle}</Text></View><Pressable onPress={onClose}><Text style={styles.close}>×</Text></Pressable></Row>
+    <View style={styles.scanPrivacy}><Text style={styles.scanPrivacyText}>Review required • Only checked rows will be applied</Text></View>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{gap:8}}>{draft.map(item=><Pressable key={item.id} onPress={()=>setDraft(items=>items.map(row=>row.id===item.id?{...row,selected:!row.selected}:row))} style={[styles.scanReviewRow,item.selected&&styles.scanReviewRowSelected]}>
+      <View style={[styles.checkBox,item.selected&&styles.checkBoxSelected]}><Text style={styles.checkText}>{item.selected?'✓':''}</Text></View>
+      <View style={{flex:1}}><Row style={{justifyContent:'space-between',gap:8}}><Text style={styles.listTitle}>{item.label}</Text><Pill text={item.confidence} tone={item.confidence==='High'?'good':'warn'}/></Row>{item.current!==undefined?<Text style={styles.mutedSmall}>Current: {item.current}</Text>:null}<Text style={styles.scanValue}>Scanned: {item.value}</Text></View>
+    </Pressable>)}</ScrollView>
+    <Pressable onPress={()=>setShowRaw(value=>!value)}><Text style={styles.rawToggle}>{showRaw?'Hide':'Show'} recognized text</Text></Pressable>
+    {showRaw?<ScrollView style={styles.rawOcr} nestedScrollEnabled><Text selectable style={styles.rawOcrText}>{review.rawText}</Text></ScrollView>:null}
+    <Row style={{gap:8}}><View style={{flex:1}}><Btn label="Cancel" variant="outline" onPress={onClose}/></View><View style={{flex:1}}><Btn label={`Apply ${selected.length}`} disabled={!selected.length} onPress={()=>onApply(selected)}/></View></Row>
+  </View></View></Modal>;
+}
 
 export default function App(){
   const [state,setState]=useState<CareerState>(()=>createDefaultState());
@@ -170,7 +253,7 @@ function ProfileForm({state,onSave,submitLabel='Save player profile'}:{state:Car
 
 function OnboardingScreen({state,onStart}:{state:CareerState;onStart:(profile:PlayerProfileInput)=>void}){
   return <SafeAreaView style={styles.safe}><StatusBar style="light"/><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView contentContainerStyle={styles.onboardingScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-    <View style={styles.onboardingHero}><View style={styles.onboardingLogo}><Text style={styles.onboardingLogoText}>2K</Text></View><Pill text="CAREER COMPANION V1.1"/><Text style={styles.onboardingTitle}>Create your prospect</Text><Text style={styles.onboardingSubtitle}>Set the identity the app will use across recruiting, social media, relationships, sponsors, news and your entire career history.</Text></View>
+    <View style={styles.onboardingHero}><View style={styles.onboardingLogo}><Text style={styles.onboardingLogoText}>2K</Text></View><Pill text="CAREER COMPANION V1.2"/><Text style={styles.onboardingTitle}>Create your prospect</Text><Text style={styles.onboardingSubtitle}>Set the identity the app will use across recruiting, social media, relationships, sponsors, news and your entire career history.</Text></View>
     <ProfileForm state={state} onSave={onStart} submitLabel="Start career"/>
     <Text style={[styles.mutedSmall,{textAlign:'center',paddingHorizontal:10}]}>You can edit these details later from More → Player. Your ratings and potential remain part of the career simulation.</Text>
   </ScrollView></KeyboardAvoidingView></SafeAreaView>;
@@ -237,16 +320,21 @@ function CareerTimeline({state}:{state:CareerState}){return <Card><SectionTitle 
 
 function Play({state,setState}:{state:CareerState;setState:(s:CareerState)=>void}){
   const [opponent,setOpponent]=useState('BOS');const [result,setResult]=useState<'W'|'L'>('W');const [importance,setImportance]=useState<(typeof importances)[number]>('Regular');
-  const [v,setV]=useState({pts:'24',reb:'5',ast:'8',stl:'1',blk:'0',tov:'3',fgm:'9',fga:'17',tpm:'3',tpa:'7',ftm:'3',fta:'4',minutes:'34',plusMinus:'8'});
+  const emptyGame=()=>({pts:'',reb:'',ast:'',stl:'',blk:'',tov:'',fgm:'',fga:'',tpm:'',tpa:'',ftm:'',fta:'',minutes:'',plusMinus:''});
+  const [v,setV]=useState(emptyGame);
+  const [review,setReview]=useState<ScanReviewData|null>(null);const scanner=use2KScreenScanner();
   const set=(k:string,val:string)=>setV(x=>({...x,[k]:val}));
   if(state.player.stage!=='NBA')return <ScrollView contentContainerStyle={styles.scroll}><Card><Text style={styles.cardTitle}>NBA games unlock after draft night</Text><Text style={styles.bodyText}>Finish the short pre-NBA path first. Once 2K26 drafts your player, this becomes the fastest way to feed game results into the career universe.</Text></Card></ScrollView>;
-  const submit=()=>{const n=(k:keyof typeof v)=>Number(v[k])||0;setState(logGame(state,{opponent,result,importance,pts:n('pts'),reb:n('reb'),ast:n('ast'),stl:n('stl'),blk:n('blk'),tov:n('tov'),fgm:n('fgm'),fga:n('fga'),tpm:n('tpm'),tpa:n('tpa'),ftm:n('ftm'),fta:n('fta'),minutes:n('minutes'),plusMinus:n('plusMinus')}));Alert.alert('Game added','The companion updated progression, social media, storylines, sponsors, relationships and milestones.')};
+  const submit=()=>{const missing=(['pts','reb','ast','minutes'] as (keyof typeof v)[]).filter(key=>v[key].trim()==='');if(missing.length)return Alert.alert('Finish the box score',`Enter or scan ${missing.map(key=>humanizeScanKey(key as GameScanKey)).join(', ')} before processing the game.`);const n=(k:keyof typeof v)=>Number(v[k])||0;setState(logGame(state,{opponent,result,importance,pts:n('pts'),reb:n('reb'),ast:n('ast'),stl:n('stl'),blk:n('blk'),tov:n('tov'),fgm:n('fgm'),fga:n('fga'),tpm:n('tpm'),tpa:n('tpa'),ftm:n('ftm'),fta:n('fta'),minutes:n('minutes'),plusMinus:n('plusMinus')}));setV(emptyGame());Alert.alert('Game added','The companion updated progression, social media, storylines, sponsors, relationships and milestones.')};
+  const currentGameValue=(key:GameScanKey)=>key==='opponent'?opponent:key==='result'?result:key==='importance'?importance:(v as Record<string,string>)[key]||'Blank';
+  const scanGame=async()=>{const raw=await scanner.scan('game stats');if(!raw)return;const fields=parseGameScreen(raw,{playerName:state.player.name,ownTeam:state.player.team,teamCodes:teams});if(!fields.length){Alert.alert('No box-score fields recognized','Show the stat headings and your player row in the same photo. You can also scan a close-up that contains labels such as PTS, REB, AST, FGM and FGA.');return}setReview({title:'Review game scan',subtitle:'Confirm the scoreboard and box-score values before they fill the game form.',rawText:raw,items:fields.map(field=>({id:field.key,label:humanizeScanKey(field.key),value:field.value,current:currentGameValue(field.key),confidence:field.confidence,payload:field}))})};
+  const applyGameScan=(items:ScanReviewItem[])=>{const next={...v};items.forEach(item=>{const field=item.payload as ScannedGameField;if(field.key==='opponent')setOpponent(field.value);else if(field.key==='result'&&(field.value==='W'||field.value==='L'))setResult(field.value);else if(field.key==='importance'&&importances.includes(field.value as any))setImportance(field.value as (typeof importances)[number]);else if(field.key in next)(next as Record<string,string>)[field.key]=field.value});setV(next);setState(recordGameScreenScan(state,items.length));setReview(null);Alert.alert('Game form filled','Review any blank or unusual values, then finish the game normally.')};
   return <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
     <SectionTitle title="Log 2K Game" side={<Canon value="2K Confirmed"/>}/>
     <Card><Text style={styles.cardTitle}>{state.player.team} game result</Text><Text style={styles.label}>Opponent</Text><View style={styles.chips}>{teams.filter(t=>t!==state.player.team).map(t=><Pressable key={t} onPress={()=>setOpponent(t)} style={[styles.chip,opponent===t&&styles.chipActive]}><Text style={[styles.chipText,opponent===t&&{color:'#fff'}]}>{t}</Text></Pressable>)}</View><Row style={{gap:8}}><Btn label="WIN" variant={result==='W'?'solid':'outline'} onPress={()=>setResult('W')}/><Btn label="LOSS" variant={result==='L'?'solid':'outline'} onPress={()=>setResult('L')}/></Row><Text style={styles.label}>Game importance</Text><View style={styles.chips}>{importances.map(i=><Pressable key={i} onPress={()=>setImportance(i)} style={[styles.chip,importance===i&&styles.chipActive]}><Text style={[styles.chipText,importance===i&&{color:'#fff'}]}>{i}</Text></Pressable>)}</View></Card>
-    <Card><Text style={styles.cardTitle}>Box score</Text><View style={styles.formGrid}><Field label="PTS" value={v.pts} onChange={x=>set('pts',x)} keyboard="number-pad"/><Field label="REB" value={v.reb} onChange={x=>set('reb',x)} keyboard="number-pad"/><Field label="AST" value={v.ast} onChange={x=>set('ast',x)} keyboard="number-pad"/><Field label="STL" value={v.stl} onChange={x=>set('stl',x)} keyboard="number-pad"/><Field label="BLK" value={v.blk} onChange={x=>set('blk',x)} keyboard="number-pad"/><Field label="TOV" value={v.tov} onChange={x=>set('tov',x)} keyboard="number-pad"/><Field label="FGM" value={v.fgm} onChange={x=>set('fgm',x)} keyboard="number-pad"/><Field label="FGA" value={v.fga} onChange={x=>set('fga',x)} keyboard="number-pad"/><Field label="3PM" value={v.tpm} onChange={x=>set('tpm',x)} keyboard="number-pad"/><Field label="3PA" value={v.tpa} onChange={x=>set('tpa',x)} keyboard="number-pad"/><Field label="FTM" value={v.ftm} onChange={x=>set('ftm',x)} keyboard="number-pad"/><Field label="FTA" value={v.fta} onChange={x=>set('fta',x)} keyboard="number-pad"/><Field label="MIN" value={v.minutes} onChange={x=>set('minutes',x)} keyboard="number-pad"/><Field label="+/-" value={v.plusMinus} onChange={x=>set('plusMinus',x)} keyboard="numbers-and-punctuation"/></View><Btn label="Finish game & process career" onPress={submit}/></Card>
+    <Card><Row style={{justifyContent:'space-between',alignItems:'center'}}><View style={{flex:1}}><Text style={styles.cardTitle}>Box score</Text><Text style={styles.mutedSmall}>Tap the camera to fill this from your player row or post-game screen.</Text></View><CameraButton label="Scan game stats" onPress={scanGame}/></Row><View style={styles.formGrid}><Field label="PTS" value={v.pts} onChange={x=>set('pts',x)} keyboard="number-pad"/><Field label="REB" value={v.reb} onChange={x=>set('reb',x)} keyboard="number-pad"/><Field label="AST" value={v.ast} onChange={x=>set('ast',x)} keyboard="number-pad"/><Field label="STL" value={v.stl} onChange={x=>set('stl',x)} keyboard="number-pad"/><Field label="BLK" value={v.blk} onChange={x=>set('blk',x)} keyboard="number-pad"/><Field label="TOV" value={v.tov} onChange={x=>set('tov',x)} keyboard="number-pad"/><Field label="FGM" value={v.fgm} onChange={x=>set('fgm',x)} keyboard="number-pad"/><Field label="FGA" value={v.fga} onChange={x=>set('fga',x)} keyboard="number-pad"/><Field label="3PM" value={v.tpm} onChange={x=>set('tpm',x)} keyboard="number-pad"/><Field label="3PA" value={v.tpa} onChange={x=>set('tpa',x)} keyboard="number-pad"/><Field label="FTM" value={v.ftm} onChange={x=>set('ftm',x)} keyboard="number-pad"/><Field label="FTA" value={v.fta} onChange={x=>set('fta',x)} keyboard="number-pad"/><Field label="MIN" value={v.minutes} onChange={x=>set('minutes',x)} keyboard="number-pad"/><Field label="+/-" value={v.plusMinus} onChange={x=>set('plusMinus',x)} keyboard="numbers-and-punctuation"/></View><Btn label="Finish game & process career" onPress={submit}/></Card>
     {state.games.length>0?<Card><SectionTitle title="Recent games"/>{state.games.slice(0,7).map(g=><View key={g.id} style={styles.listRow}><Pill text={g.result} tone={g.result==='W'?'good':'warn'}/><View style={{flex:1}}><Text style={styles.listTitle}>vs {g.opponent} • {g.pts}/{g.reb}/{g.ast}</Text><Text style={styles.mutedSmall}>{g.importance} • +{g.xp.toLocaleString()} XP</Text></View></View>)}</Card>:null}
-  </ScrollView></KeyboardAvoidingView>
+  </ScrollView><ScanBusyModal visible={scanner.busy} label={scanner.busyLabel}/><ScanReviewModal review={review} onClose={()=>setReview(null)} onApply={applyGameScan}/></KeyboardAvoidingView>
 }
 
 function Social({state,setState,onPost}:{state:CareerState;setState:(s:CareerState)=>void;onPost:(p:SocialPost)=>void}){
@@ -273,20 +361,26 @@ function MoreRoot({screen,setScreen,state,setState,onEvent}:{screen:any;setScree
 
 function PlayerScreen({state,setState,back}:{state:CareerState;setState:(s:CareerState)=>void;back:React.ReactNode}){
   const [editingProfile,setEditingProfile]=useState(false);
+  const [review,setReview]=useState<ScanReviewData|null>(null);const [reviewMode,setReviewMode]=useState<'overview'|'attributes'|'badges'|null>(null);const scanner=use2KScreenScanner();
   const cats=[...new Set(state.attributes.map(a=>a.category))];
   const p=state.player;
+  const scanOverview=async()=>{const raw=await scanner.scan('player overview');if(!raw)return;const fields=parsePlayerOverview(raw,teams);if(!fields.length){Alert.alert('No player fields recognized','Include labels such as OVR, POT, AGE, POSITION, HEIGHT or WEIGHT in the photo.');return}const current:Record<string,string>={team:p.team||'Blank',position:p.position,overall:String(p.overall),potential:String(p.potential),age:String(p.age),jersey:String(p.jersey),height:p.height,weight:String(p.weight)};setReviewMode('overview');setReview({title:'Review player scan',subtitle:'Choose which recognized player details should replace the current companion values.',rawText:raw,items:fields.map(field=>({id:field.key,label:humanizeScanKey(field.key),value:String(field.value),current:current[field.key],confidence:field.confidence,payload:field}))})};
+  const scanAttributes=async()=>{const raw=await scanner.scan('attributes');if(!raw)return;const found=parseAttributeScreen(raw,state.attributes.map(attribute=>attribute.name));if(!found.length){Alert.alert('No attributes recognized','Fill the photo with the ratings list and keep both each attribute name and its number visible. You can scan one category at a time.');return}setReviewMode('attributes');setReview({title:'Review attribute scan',subtitle:'Only ratings visible and readable in this screenshot are proposed.',rawText:raw,items:found.map(attribute=>({id:attribute.name,label:attribute.name,value:String(attribute.rating),current:String(state.attributes.find(item=>item.name===attribute.name)?.rating??'Blank'),confidence:attribute.confidence,payload:attribute}))})};
+  const scanBadges=async()=>{const raw=await scanner.scan('badges');if(!raw)return;const found=parseBadgeScreen(raw,state.badges.map(badge=>badge.name));if(!found.length){Alert.alert('No badge tiers recognized','Show the badge name and its tier text (Bronze, Silver, Gold, Hall of Fame, Legend or Locked) together. Scan another badge page separately if needed.');return}setReviewMode('badges');setReview({title:'Review badge scan',subtitle:'Confirm each badge tier before updating your player.',rawText:raw,items:found.map(badge=>({id:badge.name,label:badge.name,value:badge.level,current:state.badges.find(item=>item.name===badge.name)?.level??'Blank',confidence:badge.confidence,payload:badge}))})};
+  const applyPlayerScan=(items:ScanReviewItem[])=>{if(reviewMode==='overview')setState(applyScannedPlayerOverview(state,items.map(item=>item.payload as ScannedPlayerField)));else if(reviewMode==='attributes')setState(applyScannedAttributes(state,items.map(item=>item.payload as ScannedAttribute)));else if(reviewMode==='badges')setState(applyScannedBadges(state,items.map(item=>item.payload as ScannedBadge)));setReview(null);setReviewMode(null)};
   return <>
     <ScrollView contentContainerStyle={styles.scroll}>{back}<SectionTitle title="Player" side={<Pill text={`${p.overall} OVR`}/>}/>
       <Card>
-        <Row style={{justifyContent:'space-between',alignItems:'center'}}><View style={{flex:1}}><Text style={styles.cardTitle}>{p.name}</Text><Text style={styles.mutedSmall}>{p.position} • #{p.jersey} • {p.height} • {p.weight} lbs</Text></View><Btn small label="Edit profile" variant="outline" onPress={()=>setEditingProfile(true)}/></Row>
+        <Row style={{justifyContent:'space-between',alignItems:'center',gap:8}}><View style={{flex:1}}><Text style={styles.cardTitle}>{p.name}</Text><Text style={styles.mutedSmall}>{p.position} • #{p.jersey} • {p.height} • {p.weight} lbs</Text></View><CameraButton label="Scan player overview" onPress={scanOverview}/><Btn small label="Edit profile" variant="outline" onPress={()=>setEditingProfile(true)}/></Row>
         <View style={styles.infoGrid}><Info label="Age" value={`${p.age}`}/><Info label="Hometown" value={p.hometown}/><Info label="Nationality" value={p.nationality}/><Info label="Dominant hand" value={p.dominantHand}/><Info label="Starting program" value={p.schoolOrClub}/><Info label="HS year" value={p.highSchoolYear}/></View>
       </Card>
-      <SectionTitle title="Player Development" side={<Pill text={`${p.xp.toLocaleString()} XP`}/>}/>
+      <SectionTitle title="Player Development" side={<Row style={{gap:8,alignItems:'center'}}><Pill text={`${p.xp.toLocaleString()} XP`}/><CameraButton label="Scan attributes" onPress={scanAttributes}/></Row>}/>
       <View style={styles.metrics}><Metric label="OVR" value={p.overall}/><Metric label="POT" value={p.potential}/><Metric label="MORALE" value={p.morale}/><Metric label="FATIGUE" value={p.fatigue}/></View>
       {cats.map(cat=><Card key={cat}><Text style={styles.cardTitle}>{cat}</Text>{state.attributes.filter(a=>a.category===cat).map(a=>{const cost=attributeUpgradeCost(a.rating);return <View key={a.name} style={styles.attrRow}><View style={{flex:1}}><Text style={styles.listTitle}>{a.name}</Text><Text style={styles.mutedSmall}>Upgrade: {cost.toLocaleString()} XP</Text><Progress value={a.rating}/></View><Text style={styles.attrValue}>{a.rating}</Text><Btn small label="+1" variant="outline" onPress={()=>{const r=upgradeAttribute(state,a.name);setState(r.state);if(r.message.startsWith('Need'))Alert.alert('Not enough XP',r.message)}}/></View>})}</Card>)}
-      <Card><Text style={styles.cardTitle}>Badges</Text>{state.badges.map(b=><View key={b.name} style={styles.listRow}><View style={{flex:1}}><Text style={styles.listTitle}>{b.name}</Text><Text style={styles.mutedSmall}>{b.category}</Text></View><Pill text={b.level} tone={b.level==='Locked'?'muted':'accent'}/></View>)}</Card>
+      <Card><Row style={{justifyContent:'space-between',alignItems:'center'}}><View><Text style={styles.cardTitle}>Badges</Text><Text style={styles.mutedSmall}>Scan each visible badge page as needed.</Text></View><CameraButton label="Scan badges" onPress={scanBadges}/></Row>{state.badges.map(b=><View key={b.name} style={styles.listRow}><View style={{flex:1}}><Text style={styles.listTitle}>{b.name}</Text><Text style={styles.mutedSmall}>{b.category}</Text></View><Pill text={b.level} tone={b.level==='Locked'?'muted':'accent'}/></View>)}</Card>
     </ScrollView>
     <ProfileEditorModal state={state} visible={editingProfile} onClose={()=>setEditingProfile(false)} onSave={(profile)=>{setState(updatePlayerProfile(state,profile));setEditingProfile(false)}}/>
+    <ScanBusyModal visible={scanner.busy} label={scanner.busyLabel}/><ScanReviewModal review={review} onClose={()=>{setReview(null);setReviewMode(null)}} onApply={applyPlayerScan}/>
   </>;
 }
 
@@ -313,11 +407,15 @@ function Life({state,setState,back,onEvent}:{state:CareerState;setState:(s:Caree
 
 function League({state,setState,back}:{state:CareerState;setState:(s:CareerState)=>void;back:React.ReactNode}){
   const [type,setType]=useState('Trade');const [player,setPlayer]=useState(state.player.name);const [from,setFrom]=useState(state.player.team||'TOR');const [to,setTo]=useState('MIA');
+  const [review,setReview]=useState<ScanReviewData|null>(null);const scanner=use2KScreenScanner();
+  const scanTransactions=async()=>{const raw=await scanner.scan('transaction log');if(!raw)return;const found=parseTransactionLog(raw,teams);if(!found.length){Alert.alert('No transactions recognized','Keep complete transaction sentences visible. The scanner recognizes trades, signings, waivers, releases and waiver claims. You can still use the form for unusual transaction wording.');return}setReview({title:'Review transaction log',subtitle:'Each checked move will be added as 2K Confirmed. Existing matching moves are skipped.',rawText:raw,items:found.map((tx,index)=>({id:`${index}-${tx.player}-${tx.toTeam}`,label:`${tx.type}: ${tx.player}`,value:`${tx.fromTeam||'Unknown'} → ${tx.toTeam||'Unknown'}`,confidence:tx.confidence,payload:tx}))})};
+  const applyTransactionScan=(items:ScanReviewItem[])=>{setState(applyScannedTransactions(state,items.map(item=>item.payload as ScannedTransaction)));setReview(null)};
   return <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{back}<SectionTitle title="League Universe" side={<Pill text={`${state.transactions.length} confirmed moves`}/>}/>
-    <Card><Text style={styles.cardTitle}>Confirm an important MyNBA transaction</Text><Text style={styles.bodyText}>Mobile has no game sync, so tell the companion only about trades/free-agency moves that matter. These are recorded as 2K Confirmed canon.</Text><Field label="Player" value={player} onChange={setPlayer}/><Field label="Transaction type" value={type} onChange={setType}/><Row style={{gap:8}}><Field label="From" value={from} onChange={setFrom}/><Field label="To" value={to} onChange={setTo}/></Row><Btn label="Confirm roster move" onPress={()=>setState(manualTransaction(state,type,player,from,to))}/></Card>
+    <Card><Row style={{justifyContent:'space-between',alignItems:'center'}}><View style={{flex:1}}><Text style={styles.cardTitle}>Confirm MyNBA transactions</Text><Text style={styles.mutedSmall}>Scan a full transaction-log page or enter one move below.</Text></View><CameraButton label="Scan league transaction log" onPress={scanTransactions}/></Row><Text style={styles.bodyText}>Reviewed scans and manual entries are recorded as 2K Confirmed canon.</Text><Field label="Player" value={player} onChange={setPlayer}/><Field label="Transaction type" value={type} onChange={setType}/><Row style={{gap:8}}><Field label="From" value={from} onChange={setFrom}/><Field label="To" value={to} onChange={setTo}/></Row><Btn label="Confirm roster move" onPress={()=>setState(manualTransaction(state,type,player,from,to))}/></Card>
     <Card><SectionTitle title="Around the league"/>{state.news.slice(0,12).map(n=><View key={n.id} style={styles.newsRow}><View style={{flex:1}}><Text style={styles.listTitle}>{n.headline}</Text><Text style={styles.bodyText}>{n.body}</Text><Text style={styles.mutedSmall}>{n.outlet} • {n.date}</Text></View><Canon value={n.canon}/></View>)}</Card>
     <Card><SectionTitle title="World players"/>{state.worldPlayers.map(w=><View key={w.id} style={styles.listRow}><View style={styles.avatarSmall}><Text style={styles.avatarSmallText}>{w.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</Text></View><View style={{flex:1}}><Text style={styles.listTitle}>{w.name} • {w.position}</Text><Text style={styles.mutedSmall}>{w.team||'Prospect'} • {w.overall} OVR • {w.personality}</Text></View><Pill text={w.reputation} tone="muted"/></View>)}</Card>
     {state.transactions.length>0?<Card><SectionTitle title="Transaction history"/>{state.transactions.slice(0,10).map(tx=><View key={tx.id} style={styles.listRow}><View style={{flex:1}}><Text style={styles.listTitle}>{tx.player}: {tx.fromTeam} → {tx.toTeam}</Text><Text style={styles.mutedSmall}>{tx.type} • {tx.date}</Text></View><Canon value={tx.canon}/></View>)}</Card>:null}
+    <ScanBusyModal visible={scanner.busy} label={scanner.busyLabel}/><ScanReviewModal review={review} onClose={()=>setReview(null)} onApply={applyTransactionScan}/>
   </ScrollView>
 }
 
@@ -337,7 +435,8 @@ function Settings({state,setState,back}:{state:CareerState;setState:(s:CareerSta
   return <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{back}<SectionTitle title="Settings"/>
     <Card><Text style={styles.cardTitle}>Immersion</Text><Text style={styles.label}>Mode</Text><View style={styles.chips}>{['Basketball Focused','Immersive','Full Life','Chaos'].map(x=><Pressable key={x} onPress={()=>setState(changeSetting(state,'immersionMode',x))} style={[styles.chip,state.settings.immersionMode===x&&styles.chipActive]}><Text style={[styles.chipText,state.settings.immersionMode===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View><Text style={styles.label}>Pre-NBA simulation detail</Text><View style={styles.chips}>{['Quick','Normal','Detailed'].map(x=><Pressable key={x} onPress={()=>setState(changeSetting(state,'simDetail',x))} style={[styles.chip,state.settings.simDetail===x&&styles.chipActive]}><Text style={[styles.chipText,state.settings.simDetail===x&&{color:'#fff'}]}>{x}</Text></Pressable>)}</View><Row style={{justifyContent:'space-between',alignItems:'center'}}><View style={{flex:1}}><Text style={styles.listTitle}>Optional romantic-life events</Text><Text style={styles.mutedSmall}>Off by default. Does not affect core career progression.</Text></View><Switch value={state.settings.romanceEnabled} onValueChange={v=>setState(changeSetting(state,'romanceEnabled',v))} trackColor={{true:ACCENT,false:'#343b46'}}/></Row></Card>
     <Card><Text style={styles.cardTitle}>Backup / transfer</Text><Text style={styles.bodyText}>The Android and iOS versions use the same JSON save format, so you can move a career between phones manually.</Text><Btn label="Share / export save" onPress={()=>Share.share({title:'NBA 2K26 Career Companion Save',message:JSON.stringify(state)})}/><Text style={styles.label}>Import save JSON</Text><TextInput multiline value={importText} onChangeText={setImportText} placeholder="Paste exported save JSON here" placeholderTextColor="#626b78" style={[styles.input,{minHeight:110,textAlignVertical:'top'}]}/><Btn label="Import pasted save" variant="outline" disabled={!importText.trim()} onPress={doImport}/></Card>
-    <Card><Text style={styles.cardTitle}>Canon rules</Text><Text style={styles.bodyText}>2K Confirmed = something you say happened inside MyNBA. Companion Canon = generated story around those events. Rumor = intentionally unverified in-universe information. This mobile edition never claims to be directly synced to your game.</Text></Card>
+    <Card><SectionTitle title="2K screen scanner" side={<Pill text="ON-DEVICE" tone="good"/>}/><Text style={styles.bodyText}>Camera buttons can read game stats, player overview fields, attributes, badge tiers and league transaction logs. Recognition stays on the device and every proposed change must be reviewed before it is saved.</Text><Text style={styles.mutedSmall}>Best results: use a direct console screenshot or hold the phone square to the TV, move close enough for sharp text, avoid glare, and include each label beside its value.</Text>{state.screenScans.length?<View><Text style={styles.label}>Recent confirmed scans</Text>{state.screenScans.slice(0,5).map(scan=><View key={scan.id} style={styles.listRow}><Text style={{fontSize:18}}>📷</Text><View style={{flex:1}}><Text style={styles.listTitle}>{scan.target} • {scan.recognized} applied</Text><Text style={styles.mutedSmall}>{scan.date} • {scan.summary}</Text></View></View>)}</View>:<Text style={styles.muted}>No confirmed screen scans yet.</Text>}</Card>
+    <Card><Text style={styles.cardTitle}>Canon rules</Text><Text style={styles.bodyText}>2K Confirmed = something you manually enter or explicitly approve from a photographed 2K screen. Companion Canon = generated story around those events. Rumor = intentionally unverified in-universe information. Screen recognition is not a direct connection to game memory.</Text></Card>
     <Card><Text style={styles.cardTitle}>Danger zone</Text><Btn label="Reset career" variant="danger" onPress={reset}/></Card>
   </ScrollView>
 }
@@ -373,5 +472,10 @@ const styles=StyleSheet.create({
   menuGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},menuCard:{width:'48%',minHeight:145,backgroundColor:PANEL,borderRadius:18,borderWidth:1,borderColor:BORDER,padding:15,gap:8},back:{color:ACCENT,fontSize:15,fontWeight:'800'},
   attrRow:{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:BORDER},attrValue:{color:TEXT,fontSize:21,fontWeight:'900',width:36,textAlign:'center'},memory:{color:'#c3cad4',fontSize:12,fontStyle:'italic'},newsRow:{flexDirection:'row',gap:10,paddingVertical:12,borderBottomWidth:1,borderBottomColor:BORDER},
   avatarSmall:{width:38,height:38,borderRadius:19,backgroundColor:PANEL2,borderWidth:1,borderColor:BORDER,alignItems:'center',justifyContent:'center'},avatarSmallText:{color:TEXT,fontSize:11,fontWeight:'900'},storyRow:{paddingVertical:11,gap:6,borderBottomWidth:1,borderBottomColor:BORDER},
-  modalScrim:{flex:1,backgroundColor:'rgba(0,0,0,.72)',justifyContent:'flex-end'},modalSheet:{backgroundColor:'#12161d',borderTopLeftRadius:26,borderTopRightRadius:26,borderWidth:1,borderColor:BORDER,padding:18,paddingBottom:Platform.OS==='ios'?34:22,gap:12,maxHeight:'82%'},modalTitle:{color:TEXT,fontSize:24,fontWeight:'900'},modalChoice:{backgroundColor:PANEL2,borderRadius:15,borderWidth:1,borderColor:BORDER,padding:14,gap:4},close:{color:MUTED,fontSize:30,lineHeight:32}
+  modalScrim:{flex:1,backgroundColor:'rgba(0,0,0,.72)',justifyContent:'flex-end'},modalSheet:{backgroundColor:'#12161d',borderTopLeftRadius:26,borderTopRightRadius:26,borderWidth:1,borderColor:BORDER,padding:18,paddingBottom:Platform.OS==='ios'?34:22,gap:12,maxHeight:'82%'},modalTitle:{color:TEXT,fontSize:24,fontWeight:'900'},modalChoice:{backgroundColor:PANEL2,borderRadius:15,borderWidth:1,borderColor:BORDER,padding:14,gap:4},close:{color:MUTED,fontSize:30,lineHeight:32},
+  cameraBtn:{width:42,height:42,borderRadius:13,borderWidth:1,borderColor:'#5d403d',backgroundColor:'#261b1a',alignItems:'center',justifyContent:'center'},cameraIcon:{fontSize:19},
+  busyScrim:{flex:1,backgroundColor:'rgba(0,0,0,.76)',alignItems:'center',justifyContent:'center',padding:24},busyCard:{width:'100%',maxWidth:330,backgroundColor:PANEL,borderRadius:20,borderWidth:1,borderColor:BORDER,padding:24,alignItems:'center',gap:12},
+  scanPrivacy:{backgroundColor:'#13231d',borderWidth:1,borderColor:'#245540',borderRadius:12,paddingHorizontal:11,paddingVertical:8},scanPrivacyText:{color:GOOD,fontSize:11,fontWeight:'800'},
+  scanReviewRow:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:PANEL2,borderWidth:1,borderColor:BORDER,borderRadius:14,padding:12},scanReviewRowSelected:{borderColor:'#71443e',backgroundColor:'#221a1a'},checkBox:{width:24,height:24,borderRadius:7,borderWidth:1,borderColor:'#59616e',alignItems:'center',justifyContent:'center'},checkBoxSelected:{backgroundColor:ACCENT,borderColor:ACCENT},checkText:{color:'#fff',fontSize:14,fontWeight:'900'},scanValue:{color:TEXT,fontSize:13,fontWeight:'800',marginTop:3},
+  rawToggle:{color:ACCENT,fontSize:12,fontWeight:'800'},rawOcr:{maxHeight:110,backgroundColor:'#090b0e',borderRadius:12,borderWidth:1,borderColor:BORDER,padding:10},rawOcrText:{color:'#bac2ce',fontSize:11,lineHeight:16}
 });
