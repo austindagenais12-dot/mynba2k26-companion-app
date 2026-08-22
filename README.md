@@ -60,6 +60,8 @@ The screen scanner contains a native OCR module and is not available inside Expo
 
 The included `eas.json` has build profiles for mobile packaging.
 
+The repository also includes a GitHub Actions workflow that builds a release APK after a push to `main` or a manual workflow dispatch. The finished artifact is named `NBA2K26-Career-Companion-v1.2.1-APK`.
+
 Android APK:
 
     npm install
