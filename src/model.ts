@@ -2,6 +2,7 @@ export type Canon = '2K Confirmed' | 'User Confirmed' | 'Companion Canon' | 'Rum
 export type Stage = 'High School' | 'Pre-NBA' | 'Awaiting Draft' | 'NBA';
 export type SimDetail = 'Quick' | 'Normal' | 'Detailed';
 export type ImmersionMode = 'Basketball Focused' | 'Immersive' | 'Full Life' | 'Chaos';
+export type MyNBAEra = 'Magic vs Bird'|'Jordan'|'Kobe'|'LeBron'|'Steph'|'Modern';
 
 export type Attribute = { name: string; category: string; rating: number; cap: number };
 export type Badge = { name: string; category: string; level: 'Locked'|'Bronze'|'Silver'|'Gold'|'HOF'|'Legend'; progress: number };
@@ -25,12 +26,25 @@ export type NotificationItem = { id: string; date: string; icon: string; title: 
 export type FinanceItem = { id: string; date: string; kind: string; description: string; amount: number; balanceAfter: number };
 export type Transaction = { id: string; date: string; type: string; player: string; fromTeam: string; toTeam: string; canon: Canon; details?: string };
 export type WorldPlayer = { id: string; name: string; team: string; position: string; age: number; overall: number; potential: number; personality: string; reputation: string; history: string[] };
-export type Prospect = { id: string; name: string; position: string; age: number; overall: number; potential: number; projection: string; personality: string; background: string; status: string };
+export type Prospect = {
+  id: string; name: string; position: string; age: number; overall: number; potential: number; projection: string;
+  personality: string; background: string; status: string; height?: string; weight?: number; school?: string;
+  rank?: number; draftYear?: number; source?: 'Companion'|'2K Scan'|'Manual';
+};
+export type ScheduleGame = {
+  id: string;
+  era: MyNBAEra;
+  date: string;
+  awayTeam: string;
+  homeTeam: string;
+  source: 'NBA 2025-26'|'2K Schedule Scan'|'Manual';
+  canon: 'League Baseline'|'2K Confirmed'|'User Confirmed';
+};
 export type Milestone = { id: string; name: string; achieved: boolean; date?: string };
 export type ScreenScanRecord = {
   id: string;
   date: string;
-  target: 'Player Overview'|'Game Stats'|'Attributes'|'Badges'|'Transactions';
+  target: 'Player Overview'|'Game Stats'|'Attributes'|'Badges'|'Transactions'|'Draft Class'|'Schedule';
   recognized: number;
   summary: string;
 };
@@ -44,7 +58,10 @@ export type CareerState = {
     fatigue: number; legacy: number; agentName: string; agentTrust: number; draftProjection: string; draftDeclared: boolean;
     draftPick?: number; role: string; reputation: string[]; traits: string[];
   };
-  settings: { immersionMode: ImmersionMode; simDetail: SimDetail; romanceEnabled: boolean; autosave: boolean; onboardingComplete: boolean };
+  settings: {
+    immersionMode: ImmersionMode; simDetail: SimDetail; romanceEnabled: boolean; autosave: boolean; onboardingComplete: boolean;
+    myNBAEra: MyNBAEra; myNBASeasonStart: number;
+  };
   attributes: Attribute[];
   badges: Badge[];
   games: Game[];
@@ -60,6 +77,7 @@ export type CareerState = {
   transactions: Transaction[];
   worldPlayers: WorldPlayer[];
   prospects: Prospect[];
+  scheduleGames: ScheduleGame[];
   milestones: Milestone[];
   screenScans: ScreenScanRecord[];
 };
