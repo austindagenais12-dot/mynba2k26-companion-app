@@ -46,7 +46,9 @@ jobs:
 
       - name: Read app version
         id: app
-        run: echo "version=$(node -p \"require('./app.json').expo.version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          app_version=$(node -p 'require("./app.json").expo.version')
+          printf 'version=%s\n' "$app_version" >> "$GITHUB_OUTPUT"
 
       - name: Name APK
         run: |
