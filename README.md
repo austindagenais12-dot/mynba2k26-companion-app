@@ -1,4 +1,4 @@
-# NBA 2K26 Career Companion Mobile — Version 1.2.1
+# NBA 2K26 Career Companion Mobile — Version 1.3.0
 
 A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This edition deliberately does **not** connect to VenueLab, NBA 2K26 memory, or your PC. You can enter facts manually or approve fields recognized from photos/screenshots of your console; the app generates the immersive career world around them.
 
@@ -12,6 +12,12 @@ A standalone mobile career-RPG companion for NBA 2K26 MyNBA Player Lock. This ed
 - NBA Draft handoff: NBA 2K26 MyNBA determines your actual draft team and pick
 - Camera/screenshot-assisted game logging with a required review step
 - On-device recognition for player overview fields, attributes, badge tiers, and transaction logs
+- Multi-photo draft-class import with a review step and complete manual prospect editing
+- Schedule/calendar tab with the full 1,230-game 2025–26 regular-season baseline
+- Multi-photo MyNBA schedule matching with era-specific 2K Confirmed overrides
+- All six NBA 2K26 MyNBA Era starts with historically matched teams and roster browsing
+- Season-aware historical changes for real expansions, relocations, rebrands, league structure and major rules through 2025–26
+- Optional MyPLAYER animation suggestions using real NBA 2K26 package names and saved build ratings
 - Original Android launcher icon with adaptive and themed-icon artwork
 - XP and attribute upgrades with escalating costs
 - Badge tracker
@@ -60,7 +66,7 @@ The screen scanner contains a native OCR module and is not available inside Expo
 
 The included `eas.json` has build profiles for mobile packaging.
 
-The repository also includes a GitHub Actions workflow that builds a release APK after a push to `main` or a manual workflow dispatch. The finished artifact is named `NBA2K26-Career-Companion-v1.2.1-APK`.
+The repository also includes a GitHub Actions workflow that builds a release APK after a push to `main` or a manual workflow dispatch. Artifact and APK names are read from `app.json`; this release produces `NBA2K26-Career-Companion-v1.3.0-APK`.
 
 Android APK:
 
@@ -101,3 +107,15 @@ Version 1.2 adds small camera buttons beside the box score, player overview, att
 The parser supports labeled game stats and column-style box scores, common NBA 2K attribute names, badge tiers, player OVR/POT/body fields, and multi-line trade/signing/waiver/release logs. Direct screenshots and sharp, glare-free TV photos give the best results.
 
 The Android package also includes a custom launcher icon using the companion's charcoal and coral palette. Separate foreground and monochrome assets support adaptive masks and Android 13+ themed icons.
+
+## Version 1.3 — Universe Update
+
+Version 1.3 adds a dedicated draft-class workflow, calendar, era rosters and optional animation guidance:
+
+- **More → Draft Class** imports one or many draft-board screenshots, requires row-by-row review, matches existing players by name, and keeps every prospect field manually editable.
+- **Calendar** includes the complete final 2025–26 NBA regular-season slate: 1,230 games and 82 appearances for every current team. A user can select up to 20 schedule screenshots and approve 2K-specific replacements.
+- **More → League → MyNBA Era** supports Magic vs. Bird (1983–84), Jordan (1991–92), Kobe (2002–03), LeBron (2010–11), Steph (2016–17), and Modern (2025–26), with the historically correct number of franchises and an offline roster browser.
+- **Historical Season** advances the league year by year. Active team selectors follow real expansion, relocation and rebranding, while the rule panel switches period-correct playoff formats, defensive rules, clocks, lottery format, replay/challenges, Play-In and NBA Cup status.
+- **More → Animations** recommends real NBA 2K26 jump-shot bases, dribble styles, layup packages, signature dunks, pass styles and motion styles from the saved player build. These are optional immersion suggestions, never progression requirements.
+
+Historical roster baselines reflect the real start season. NBA 2K26 may replace particular retired players with generic players when likeness rights are unavailable. The built-in historical-change timeline ends at the real 2025–26 season; later fictional MyNBA changes remain driven by the user's 2K save, schedule scans and confirmed transactions.
