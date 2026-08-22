@@ -9,6 +9,10 @@ This folder is configured as the Android-only edition.
 
 The `preview` profile in `eas.json` requests APK output for direct installation.
 
+## Build with GitHub Actions
+
+The included `Build Android APK` workflow runs on pushes to `main` and can also be started manually from the repository's **Actions** tab. Its downloadable artifact contains `NBA2K26_Career_Companion_v1.2.1.apk`.
+
 ## Local Android Studio build
 
 Install Android Studio/SDK first, then:
