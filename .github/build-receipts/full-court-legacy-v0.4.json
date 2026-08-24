@@ -1,7 +1,7 @@
 {
-  "status": "failure",
-  "source_sha": "b845a32983e8b199e6af29eb849c1a355ed9d4d7",
-  "run_id": 32760144978,
+  "status": "in_progress",
+  "source_sha": "666bf74a288c502729edc3188ee1435787de2791",
+  "run_id": 32760458630,
   "artifact_id": "",
   "apk_sha256": "",
   "apk_size_bytes": 0
