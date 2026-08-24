@@ -15,14 +15,14 @@ static func generate_identity(rng: RandomNumberGenerator, first_override: String
 	var background := random_item(rng, economic_backgrounds())
 	var household := random_item(rng, household_types())
 	var home := random_item(rng, childhood_homes())
-	var trait := random_item(rng, childhood_traits())
+	var childhood_trait := random_item(rng, childhood_traits())
 	var challenge := random_item(rng, early_challenges())
 	var life_seed := int(rng.randi()) * 65537 + int(rng.randi())
 	var identity := random_item(rng, ["Woman", "Man", "Non-binary person"])
 	var pronouns: String = str({"Woman": "she/her", "Man": "he/him", "Non-binary person": "they/them"}.get(identity, "they/them"))
 	var parents: Array = generate_parents(rng, last_name, selected_set, household)
 	var siblings: Array = generate_siblings(rng, last_name, selected_set)
-	var stats: Dictionary = generate_starting_stats(rng, background, trait, challenge)
+	var stats: Dictionary = generate_starting_stats(rng, background, childhood_trait, challenge)
 	var appearance: Dictionary = generate_appearance(rng, life_seed)
 	var history: Array = generate_origin_history(rng, first_name, last_name, birthplace, parents, siblings, background, home, challenge)
 	return {
@@ -38,7 +38,7 @@ static func generate_identity(rng: RandomNumberGenerator, first_override: String
 			"economic": background,
 			"household": household,
 			"home": home,
-			"childhood_trait": trait,
+			"childhood_trait": childhood_trait,
 			"early_challenge": challenge,
 			"family_tradition": random_item(rng, family_traditions())
 		},
@@ -140,7 +140,7 @@ static func generate_siblings(rng: RandomNumberGenerator, family_name: String, s
 	return siblings
 
 
-static func generate_starting_stats(rng: RandomNumberGenerator, background: String, trait: String, challenge: String) -> Dictionary:
+static func generate_starting_stats(rng: RandomNumberGenerator, background: String, childhood_trait: String, challenge: String) -> Dictionary:
 	var stats := {
 		"health": rng.randi_range(68, 96),
 		"happiness": rng.randi_range(56, 92),
@@ -155,7 +155,7 @@ static func generate_starting_stats(rng: RandomNumberGenerator, background: Stri
 	if "uncertain" in background.to_lower() or "struggling" in background.to_lower():
 		stats["discipline"] = int(stats["discipline"]) + 5
 		stats["happiness"] = int(stats["happiness"]) - 5
-	match trait:
+	match childhood_trait:
 		"Curious": stats["smarts"] = int(stats["smarts"]) + 9
 		"Fearless": stats["confidence"] = int(stats["confidence"]) + 9
 		"Patient": stats["discipline"] = int(stats["discipline"]) + 9
