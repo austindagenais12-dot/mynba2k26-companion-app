@@ -1,8 +1,8 @@
 {
-  "status": "in_progress",
+  "status": "success",
   "source_sha": "6b1c82dd78d522f4f80f7045134b3feb26b28ca0",
   "run_id": 32765596571,
-  "artifact_id": "",
-  "apk_sha256": "",
-  "apk_size_bytes": 0
+  "artifact_id": "9534335275",
+  "apk_sha256": "e9b988e7d2f7de6f6eff55f5c7450162d9d28fe518f7be9bf0a72beefc7218d8",
+  "apk_size_bytes": 28493198
 }
