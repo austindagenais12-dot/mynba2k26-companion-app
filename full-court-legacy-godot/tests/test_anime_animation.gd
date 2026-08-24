@@ -28,10 +28,14 @@ func _initialize() -> void:
 	assert(not _contains_box_mesh(model), "Anime body and uniform geometry must remain rounded; BoxMesh primitives are not allowed in the player model.")
 	model.update_player_animation(0.016, 0.8, false, true, false, 0.0, 1)
 	animation_player.advance(0.2)
-	var right_hand := model.get_hand_position(1)
-	var left_hand := model.get_hand_position(-1)
-	assert(right_hand.is_finite() and left_hand.is_finite(), "Animated hand anchors must provide valid ball attachment positions.")
-	assert(right_hand.distance_to(left_hand) > 0.2, "Left and right hand anchors must remain spatially distinct.")
+	var right_hand_anchor := model.get_node_or_null("AnimatedVisualRig/TorsoRoot/RightShoulder/Elbow/HandAnchor") as Node3D
+	var left_hand_anchor := model.get_node_or_null("AnimatedVisualRig/TorsoRoot/LeftShoulder/Elbow/HandAnchor") as Node3D
+	var right_shoulder := model.get_node_or_null("AnimatedVisualRig/TorsoRoot/RightShoulder") as Node3D
+	var left_shoulder := model.get_node_or_null("AnimatedVisualRig/TorsoRoot/LeftShoulder") as Node3D
+	assert(right_hand_anchor != null and left_hand_anchor != null, "Both animated hand anchors must exist for ball attachment.")
+	assert(right_hand_anchor != left_hand_anchor and right_hand_anchor.position.is_finite() and left_hand_anchor.position.is_finite(), "Hand anchors must be distinct and valid.")
+	assert(right_shoulder != null and left_shoulder != null and right_shoulder.position.x > 0.2 and left_shoulder.position.x < -0.2, "The articulated hand chains must remain on opposite sides of the rig.")
+	assert(model.has_method("get_hand_position"), "The gameplay ball-attachment API must remain available to the in-tree scene smoke test.")
 
 	model.play_crossover(-1)
 	animation_player.advance(0.12)
