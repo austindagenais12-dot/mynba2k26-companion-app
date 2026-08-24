@@ -117,7 +117,7 @@ static func build_catalog() -> void:
 					var id_value := slugify("%s_%s_%s" % [sector_name, base_title, workplace])
 					var salary_variation := role_number * 850 + context_number * 375 + int(stable_number(id_value) % 2200)
 					var salary := base_salary + salary_variation
-					var min_age := [16, 18, 18, 21, 24][clampi(education, 0, 4)]
+					var min_age: int = int([16, 18, 18, 21, 24][clampi(education, 0, 4)])
 					var job := {
 						"id": id_value,
 						"title": "%s — %s" % [base_title, workplace],
