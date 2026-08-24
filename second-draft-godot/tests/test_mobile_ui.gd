@@ -16,7 +16,7 @@ func run_tests() -> void:
 	root.add_child(app)
 	await wait_frames(3)
 
-	for page_name in ["life", "people", "work", "activities", "assets"]:
+	for page_name in ["life", "people", "work", "sports", "activities", "assets"]:
 		app.call("show_page", page_name)
 		await wait_frames(3)
 		var page_host := app.get("page_host") as Control
@@ -149,7 +149,7 @@ func finish(failures: Array[String], app: Node) -> void:
 	if is_instance_valid(app):
 		app.queue_free()
 	if failures.is_empty():
-		print("PASS: all five pages scroll, positions persist, touch controls pass drags, and text fields follow Android keyboard focus.")
+		print("PASS: all six pages scroll, positions persist, touch controls pass drags, and text fields follow Android keyboard focus.")
 		quit(0)
 		return
 	for failure in failures:

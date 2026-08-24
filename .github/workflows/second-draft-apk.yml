@@ -30,14 +30,14 @@ jobs:
         run: |
           set -euo pipefail
           RECEIPT_DIR=".github/build-receipts"
-          RECEIPT_PATH="$RECEIPT_DIR/second-draft-v0.3.json"
+          RECEIPT_PATH="$RECEIPT_DIR/second-draft-v0.4.json"
           mkdir -p "$RECEIPT_DIR"
           printf '{\n  "status": "in_progress",\n  "source_sha": "%s",\n  "run_id": %s,\n  "artifact_id": "",\n  "apk_sha256": "",\n  "apk_size_bytes": 0\n}\n' \
             "$SOURCE_SHA" "$RUN_ID" > "$RECEIPT_PATH"
           git config user.name "Second Draft CI"
           git config user.email "actions@users.noreply.github.com"
           git add "$RECEIPT_PATH"
-          git commit -m "Start Second Draft v0.3 build $RUN_ID"
+          git commit -m "Start Second Draft v0.4 build $RUN_ID"
           git push origin "HEAD:second-draft-life-sim-apk"
 
       - name: Set up Java 17
@@ -106,6 +106,7 @@ jobs:
           timeout --signal=KILL 120s godot --headless --path second-draft-godot --import
           timeout --signal=KILL 60s godot --headless --path second-draft-godot --script res://tests/test_catalog.gd
           timeout --signal=KILL 90s godot --headless --path second-draft-godot --script res://tests/test_career_catalog.gd
+          timeout --signal=KILL 120s godot --headless --path second-draft-godot --script res://tests/test_procedural_systems.gd
           timeout --signal=KILL 60s godot --headless --path second-draft-godot --script res://tests/test_simulation.gd
           timeout --signal=KILL 90s godot --headless --path second-draft-godot --script res://tests/test_mobile_ui.gd
           timeout --signal=KILL 60s godot --headless --path second-draft-godot --quit-after 30 2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
@@ -124,16 +125,16 @@ jobs:
           mkdir -p second-draft-godot/build
           godot --headless --path second-draft-godot \
             --export-debug Android \
-            "$GITHUB_WORKSPACE/second-draft-godot/build/SecondDraft_v0.3.apk"
-          test -s second-draft-godot/build/SecondDraft_v0.3.apk
-          sha256sum second-draft-godot/build/SecondDraft_v0.3.apk
+            "$GITHUB_WORKSPACE/second-draft-godot/build/SecondDraft_v0.4.apk"
+          test -s second-draft-godot/build/SecondDraft_v0.4.apk
+          sha256sum second-draft-godot/build/SecondDraft_v0.4.apk
 
       - name: Upload APK
         id: upload-apk
         uses: actions/upload-artifact@v4
         with:
-          name: SecondDraft-Android-v0.3
-          path: second-draft-godot/build/SecondDraft_v0.3.apk
+          name: SecondDraft-Android-v0.4
+          path: second-draft-godot/build/SecondDraft_v0.4.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -148,8 +149,8 @@ jobs:
         run: |
           set -euo pipefail
           RECEIPT_DIR=".github/build-receipts"
-          RECEIPT_PATH="$RECEIPT_DIR/second-draft-v0.3.json"
-          APK_PATH="second-draft-godot/build/SecondDraft_v0.3.apk"
+          RECEIPT_PATH="$RECEIPT_DIR/second-draft-v0.4.json"
+          APK_PATH="second-draft-godot/build/SecondDraft_v0.4.apk"
           mkdir -p "$RECEIPT_DIR"
           APK_SHA256=""
           APK_SIZE=0
@@ -164,6 +165,6 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add "$RECEIPT_PATH"
           if ! git diff --cached --quiet; then
-            git commit -m "Record Second Draft v0.3 build $RUN_ID"
+            git commit -m "Record Second Draft v0.4 build $RUN_ID"
             git push origin "HEAD:second-draft-life-sim-apk"
           fi

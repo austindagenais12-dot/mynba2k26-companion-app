@@ -2,6 +2,7 @@ extends RefCounted
 class_name LifeSimulation
 
 const SAVE_PATH := "user://second_draft_save.json"
+const SAVE_VERSION := 4
 const STAT_KEYS := ["health", "happiness", "smarts", "confidence", "discipline", "reputation"]
 const RELATIONSHIP_KEYS := ["family", "friends"]
 
@@ -18,13 +19,23 @@ func _init(seed_value: int = -1) -> void:
 		rng.randomize()
 
 
-func new_life(first_name: String = "Austin", last_name: String = "Dagenais") -> void:
+func new_life(first_name: String = "", last_name: String = "") -> void:
+	var identity := LifeGenerator.generate_identity(rng, first_name, last_name)
 	data = {
-		"first_name": first_name.strip_edges() if not first_name.strip_edges().is_empty() else "Austin",
-		"last_name": last_name.strip_edges() if not last_name.strip_edges().is_empty() else "Dagenais",
+		"life_seed": int(identity.get("life_seed", rng.randi())),
+		"first_name": str(identity.get("first_name", "Alex")),
+		"last_name": str(identity.get("last_name", "Morgan")),
+		"identity": str(identity.get("identity", "Non-binary person")),
+		"pronouns": str(identity.get("pronouns", "they/them")),
 		"age": 0,
 		"year": 2026,
-		"birthplace": "Kelowna, British Columbia",
+		"birthplace": str(identity.get("birthplace", "Halifax, Nova Scotia")),
+		"birth_month": str(identity.get("birth_month", "January")),
+		"birth_day": int(identity.get("birth_day", 1)),
+		"background": identity.get("background", {}).duplicate(true),
+		"parents": identity.get("parents", []).duplicate(true),
+		"siblings": identity.get("siblings", []).duplicate(true),
+		"appearance": identity.get("appearance", {}).duplicate(true),
 		"alive": true,
 		"cause_of_death": "",
 		"balance": 0,
@@ -39,28 +50,23 @@ func new_life(first_name: String = "Austin", last_name: String = "Dagenais") -> 
 		"education_label": "At home",
 		"education_path": "",
 		"education_program": {},
-		"stats": {
-			"health": 84,
-			"happiness": 78,
-			"smarts": 56,
-			"confidence": 52,
-			"discipline": 50,
-			"reputation": 50
-		},
+		"stats": identity.get("stats", {}).duplicate(true),
 		"relationships": {
-			"family": {"name": "Family", "value": 86},
-			"friends": {"name": "Friends", "value": 45}
+			"family": {"name": "Extended Family", "value": rng.randi_range(60, 90)},
+			"friends": {"name": "Friends", "value": rng.randi_range(36, 58)}
 		},
 		"partner": {},
 		"children": [],
 		"assets": [],
 		"activities_used": [],
+		"sports": SportsSystem.new_state(),
+		"dynamic_event_count": 0,
+		"work_shift_year": -1,
 		"flags": {},
-		"history": []
+		"history": identity.get("history", []).duplicate(true)
 	}
 	pending_event = {}
 	recent_event_ids.clear()
-	_add_history("Born in Kelowna", "%s %s entered the world surrounded by mountains and lake air." % [data["first_name"], data["last_name"]], "gold")
 	save_game()
 
 
@@ -76,6 +82,7 @@ func age_up() -> Dictionary:
 	data["year"] = int(data.get("year", 2026)) + 1
 	data["activities_used"] = []
 	_process_school()
+	_process_sports()
 	_process_career()
 	_process_finances()
 	_process_natural_changes()
@@ -201,6 +208,93 @@ func enroll_education(program_id: String) -> Dictionary:
 	return {"ok": true, "message": "Enrollment confirmed."}
 
 
+func join_sport(sport_id: String) -> Dictionary:
+	if not bool(data.get("alive", false)):
+		return {"ok": false, "message": "This life has ended."}
+	var result := SportsSystem.join_sport(data.get("sports", {}), sport_id, int(data.get("age", 0)), int(data.get("year", 2026)), data.get("stats", {}), rng)
+	if bool(result.get("ok", false)):
+		data["sports"] = result.get("state", {}).duplicate(true)
+		_add_history("Joined %s" % str(data["sports"].get("sport_name", "a sport")), str(result.get("message", "A new athletic pathway began.")), "blue")
+		save_game()
+	return result
+
+
+func sports_train(action: String) -> Dictionary:
+	var result := SportsSystem.training_action(data.get("sports", {}), action, int(data.get("year", 2026)), rng)
+	if bool(result.get("ok", false)):
+		data["sports"] = result.get("state", {}).duplicate(true)
+		data["stats"]["health"] = int(data["stats"].get("health", 50)) + (3 if action == "physical" else 1)
+		data["stats"]["discipline"] = int(data["stats"].get("discipline", 50)) + 2
+		_clamp_all_values()
+		_add_history("Athlete development", str(result.get("message", "Training complete.")), "teal")
+		save_game()
+	return result
+
+
+func create_sports_session() -> Dictionary:
+	var sports: Dictionary = data.get("sports", {})
+	if str(sports.get("sport_id", "")).is_empty():
+		return {"ok": false, "message": "Join a sport before playing a season."}
+	if not SportsSystem.can_play_season(sports, int(data.get("year", 2026))):
+		return {"ok": false, "message": "You already completed this season."}
+	var session := SportsSystem.create_season_session(sports, int(rng.randi()))
+	session["ok"] = true
+	return session
+
+
+func complete_sports_session(score: int, total: int) -> Dictionary:
+	var result := SportsSystem.complete_season(data.get("sports", {}), score, total, int(data.get("age", 0)), int(data.get("year", 2026)), rng)
+	if not bool(result.get("ok", false)):
+		return result
+	data["sports"] = result.get("state", {}).duplicate(true)
+	var sports_job: Dictionary = result.get("job", {})
+	if not sports_job.is_empty():
+		data["job"] = sports_job.duplicate(true)
+		data["job_progress"] = 0
+		data["retired"] = false
+		data["part_time"] = false
+	data["stats"]["health"] = int(data["stats"].get("health", 50)) + 2
+	data["stats"]["confidence"] = int(data["stats"].get("confidence", 50)) + score * 2
+	data["stats"]["reputation"] = int(data["stats"].get("reputation", 50)) + score
+	_clamp_all_values()
+	_add_history("%s season" % str(data["sports"].get("sport_name", "Athletic")), str(result.get("message", "The season ended.")), "gold" if score == total else "teal")
+	save_game()
+	return result
+
+
+func create_work_session() -> Dictionary:
+	if not bool(data.get("alive", false)):
+		return {"ok": false, "message": "This life has ended."}
+	var job: Dictionary = data.get("job", {})
+	if job.is_empty() or bool(data.get("retired", false)):
+		return {"ok": false, "message": "Get an active job before starting a shift."}
+	if int(data.get("work_shift_year", -1)) == int(data.get("year", 2026)):
+		return {"ok": false, "message": "You already completed a focused work shift this year."}
+	return JobMinigame.create_session(job, int(rng.randi()))
+
+
+func complete_work_session(score: int, total: int) -> Dictionary:
+	var job: Dictionary = data.get("job", {})
+	if job.is_empty() or bool(data.get("retired", false)):
+		return {"ok": false, "message": "There is no active job shift to complete."}
+	if int(data.get("work_shift_year", -1)) == int(data.get("year", 2026)):
+		return {"ok": false, "message": "This year's focused shift is already complete."}
+	var rating := int(round(float(score) / float(maxi(1, total)) * 100.0))
+	var progress_gain := 7 + score * 7
+	var bonus := int(round(float(job.get("salary", 0)) * (0.0025 + float(score) * 0.0015)))
+	data["work_shift_year"] = int(data.get("year", 2026))
+	data["job_progress"] = int(data.get("job_progress", 0)) + progress_gain
+	data["balance"] = int(data.get("balance", 0)) + bonus
+	data["stats"]["discipline"] = int(data["stats"].get("discipline", 50)) + 2 + score
+	data["stats"]["confidence"] = int(data["stats"].get("confidence", 50)) + score
+	data["stats"]["reputation"] = int(data["stats"].get("reputation", 50)) + maxi(0, score - 1)
+	_clamp_all_values()
+	var message := "%d%% shift performance. You earned a %s performance bonus and %d career progress." % [rating, format_money(bonus), progress_gain]
+	_add_history("Work shift: %s" % str(job.get("base_title", job.get("title", "Career"))), message, "gold" if score == total else "teal")
+	save_game()
+	return {"ok": true, "message": message, "rating": rating, "bonus": bonus}
+
+
 func relationship_action(key: String, action: String) -> Dictionary:
 	var relationship := _get_relationship(key)
 	if relationship.is_empty():
@@ -264,6 +358,16 @@ func owns_asset(asset_id: String) -> bool:
 
 func relationship_entries() -> Array:
 	var entries: Array = []
+	var parents: Array = data.get("parents", [])
+	for index in range(parents.size()):
+		var parent: Dictionary = parents[index].duplicate(true)
+		parent["key"] = "parent_%d" % index
+		entries.append(parent)
+	var siblings: Array = data.get("siblings", [])
+	for index in range(siblings.size()):
+		var sibling: Dictionary = siblings[index].duplicate(true)
+		sibling["key"] = "sibling_%d" % index
+		entries.append(sibling)
 	var relations: Dictionary = data.get("relationships", {})
 	for key in RELATIONSHIP_KEYS:
 		if relations.has(key):
@@ -310,7 +414,7 @@ func save_game() -> bool:
 	if file == null:
 		return false
 	var payload := {
-		"version": 2,
+		"version": SAVE_VERSION,
 		"data": data,
 		"pending_event": pending_event,
 		"recent_event_ids": recent_event_ids,
@@ -333,14 +437,34 @@ func load_game() -> bool:
 	if not payload.get("data", {}) is Dictionary:
 		return false
 	data = payload.get("data", {}).duplicate(true)
-	if not data.has("education_program"):
-		data["education_program"] = {}
+	_migrate_loaded_data()
 	pending_event = payload.get("pending_event", {}).duplicate(true)
 	recent_event_ids = payload.get("recent_event_ids", []).duplicate()
 	if payload.has("rng_state"):
 		rng.state = int(payload["rng_state"])
 	_clamp_all_values()
 	return not data.is_empty()
+
+
+func _migrate_loaded_data() -> void:
+	var migration_rng := RandomNumberGenerator.new()
+	var migration_key := "%s|%s|%s|%s" % [data.get("first_name", "Alex"), data.get("last_name", "Morgan"), data.get("birthplace", ""), data.get("year", 2026)]
+	migration_rng.seed = CareerCatalog.stable_number(migration_key)
+	var generated := LifeGenerator.generate_identity(migration_rng, str(data.get("first_name", "Alex")), str(data.get("last_name", "Morgan")))
+	for key in ["life_seed", "identity", "pronouns", "birthplace", "birth_month", "birth_day", "background", "parents", "siblings", "appearance"]:
+		if not data.has(key):
+			var fallback = generated.get(key)
+			data[key] = fallback.duplicate(true) if fallback is Array or fallback is Dictionary else fallback
+	if not data.has("education_program"):
+		data["education_program"] = {}
+	if not data.has("sports"):
+		data["sports"] = SportsSystem.new_state()
+	if not data.has("dynamic_event_count"):
+		data["dynamic_event_count"] = 0
+	if not data.has("work_shift_year"):
+		data["work_shift_year"] = -1
+	if not data.has("history"):
+		data["history"] = generated.get("history", []).duplicate(true)
 
 
 func format_money(value: int) -> String:
@@ -397,6 +521,28 @@ func _process_active_education_program() -> void:
 	else:
 		data["education_label"] = "%s — %d years left" % [str(program.get("title", "Program")), int(program.get("years_left", 1))]
 		data["education_program"] = program
+
+
+func _process_sports() -> void:
+	var sports: Dictionary = data.get("sports", {})
+	if str(sports.get("sport_id", "")).is_empty():
+		return
+	var result := SportsSystem.process_year(sports, int(data.get("age", 0)), int(data.get("year", 2026)), rng)
+	data["sports"] = result.get("state", sports).duplicate(true)
+	var sports_job: Dictionary = result.get("job", {})
+	if not sports_job.is_empty():
+		data["job"] = sports_job.duplicate(true)
+		data["job_progress"] = 0
+		data["retired"] = false
+		data["part_time"] = false
+	var message := str(result.get("message", ""))
+	if not message.is_empty():
+		if bool(data["sports"].get("retired", false)):
+			var current_job: Dictionary = data.get("job", {})
+			if bool(current_job.get("sports_job", false)):
+				data["job"] = {}
+				data["job_progress"] = 0
+		_add_history("Athletic pathway", message, "gold")
 
 
 func _process_career() -> void:
@@ -468,6 +614,16 @@ func _process_natural_changes() -> void:
 		child["age"] = int(child.get("age", 0)) + 1
 		child["value"] = int(child.get("value", 70)) - rng.randi_range(0, 1)
 	data["children"] = children
+	var parents: Array = data.get("parents", [])
+	for parent in parents:
+		parent["age"] = int(parent.get("age", 30)) + 1
+		parent["value"] = int(parent.get("value", 70)) - rng.randi_range(0, 1)
+	data["parents"] = parents
+	var siblings: Array = data.get("siblings", [])
+	for sibling in siblings:
+		sibling["age"] = int(sibling.get("age", 0)) + 1
+		sibling["value"] = int(sibling.get("value", 65)) - rng.randi_range(0, 1)
+	data["siblings"] = siblings
 	_clamp_all_values()
 
 
@@ -497,6 +653,11 @@ func _check_for_death() -> bool:
 
 
 func _choose_random_event() -> Dictionary:
+	if rng.randf() < 0.72:
+		data["dynamic_event_count"] = int(data.get("dynamic_event_count", 0)) + 1
+		var generated := DynamicEventGenerator.generate(data, rng, int(data["dynamic_event_count"]))
+		if not generated.is_empty():
+			return generated
 	var eligible: Array = []
 	var total_weight := 0
 	for event in EventCatalog.events():
@@ -604,14 +765,12 @@ func _set_job(job_id: String) -> void:
 func _create_partner() -> void:
 	if not data.get("partner", {}).is_empty():
 		return
-	var names := ["Jamie", "Morgan", "Riley", "Avery", "Jordan", "Taylor", "Casey", "Cameron"]
-	data["partner"] = {"name": names[rng.randi_range(0, names.size() - 1)], "value": rng.randi_range(64, 78), "age": maxi(18, int(data.get("age", 18)) + rng.randi_range(-3, 3))}
+	data["partner"] = {"name": LifeGenerator.random_person_name(rng), "relation": "Partner", "value": rng.randi_range(64, 78), "age": maxi(18, int(data.get("age", 18)) + rng.randi_range(-3, 3))}
 
 
 func _create_child() -> void:
 	var children: Array = data.get("children", [])
-	var names := ["Alex", "Sam", "Quinn", "Robin", "Charlie", "Skyler", "Drew", "Reese"]
-	children.append({"name": names[rng.randi_range(0, names.size() - 1)], "value": 82, "age": 0})
+	children.append({"name": LifeGenerator.random_person_name(rng, str(data.get("last_name", ""))), "relation": "Child", "value": 82, "age": 0})
 	data["children"] = children
 
 
@@ -619,10 +778,22 @@ func _get_relationship(key: String) -> Dictionary:
 	if key == "partner":
 		return data.get("partner", {})
 	if key.begins_with("child_"):
-		var index := int(key.trim_prefix("child_"))
+		var child_index := int(key.trim_prefix("child_"))
 		var children: Array = data.get("children", [])
-		if index >= 0 and index < children.size():
-			return children[index]
+		if child_index >= 0 and child_index < children.size():
+			return children[child_index]
+		return {}
+	if key.begins_with("parent_"):
+		var parent_index := int(key.trim_prefix("parent_"))
+		var parents: Array = data.get("parents", [])
+		if parent_index >= 0 and parent_index < parents.size():
+			return parents[parent_index]
+		return {}
+	if key.begins_with("sibling_"):
+		var sibling_index := int(key.trim_prefix("sibling_"))
+		var siblings: Array = data.get("siblings", [])
+		if sibling_index >= 0 and sibling_index < siblings.size():
+			return siblings[sibling_index]
 		return {}
 	return data.get("relationships", {}).get(key, {})
 
@@ -636,11 +807,25 @@ func _set_relationship_value(key: String, value: int) -> void:
 			data["partner"] = partner
 		return
 	if key.begins_with("child_"):
-		var index := int(key.trim_prefix("child_"))
+		var child_index := int(key.trim_prefix("child_"))
 		var children: Array = data.get("children", [])
-		if index >= 0 and index < children.size():
-			children[index]["value"] = value
+		if child_index >= 0 and child_index < children.size():
+			children[child_index]["value"] = value
 			data["children"] = children
+		return
+	if key.begins_with("parent_"):
+		var parent_index := int(key.trim_prefix("parent_"))
+		var parents: Array = data.get("parents", [])
+		if parent_index >= 0 and parent_index < parents.size():
+			parents[parent_index]["value"] = value
+			data["parents"] = parents
+		return
+	if key.begins_with("sibling_"):
+		var sibling_index := int(key.trim_prefix("sibling_"))
+		var siblings: Array = data.get("siblings", [])
+		if sibling_index >= 0 and sibling_index < siblings.size():
+			siblings[sibling_index]["value"] = value
+			data["siblings"] = siblings
 		return
 	var relations: Dictionary = data.get("relationships", {})
 	if relations.has(key):

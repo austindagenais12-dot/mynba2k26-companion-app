@@ -5,8 +5,10 @@ func _initialize() -> void:
 	var failures: Array[String] = []
 	var simulation := LifeSimulation.new(20260824)
 	simulation.new_life("Austin", "Dagenais")
-	if str(simulation.data.get("birthplace", "")) != "Kelowna, British Columbia":
-		failures.append("New life did not initialize the expected original profile.")
+	if str(simulation.data.get("first_name", "")) != "Austin" or str(simulation.data.get("birthplace", "")).is_empty():
+		failures.append("New life did not preserve the chosen name and generate an origin.")
+	if simulation.data.get("parents", []).is_empty() or simulation.data.get("appearance", {}).is_empty():
+		failures.append("New life did not generate family and portrait DNA.")
 
 	for target_age in range(1, 31):
 		var event := simulation.age_up()

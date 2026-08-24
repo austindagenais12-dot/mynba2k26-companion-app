@@ -35,6 +35,7 @@ var page_scroll_positions: Dictionary = {}
 var scroll_spacers: Dictionary = {}
 var focused_text_input: Control
 var focus_reveal_serial := 0
+var active_minigame: Dictionary = {}
 
 
 func _ready() -> void:
@@ -130,11 +131,12 @@ func build_bottom_nav() -> Control:
 		["life", "LIFE"],
 		["people", "PEOPLE"],
 		["work", "WORK"],
+		["sports", "SPORTS"],
 		["activities", "DO"],
 		["assets", "ASSETS"]
 	]
 	for page in pages:
-		var button := make_button(str(page[1]), "nav", 12)
+		var button := make_button(str(page[1]), "nav", 10)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(show_page.bind(str(page[0])))
 		row.add_child(button)
@@ -173,6 +175,8 @@ func show_page(page_name: String) -> void:
 			build_people_page()
 		"work":
 			build_work_page()
+		"sports":
+			build_sports_page()
 		"activities":
 			build_activities_page()
 		"assets":
@@ -204,6 +208,7 @@ func update_nav() -> void:
 func build_life_page() -> void:
 	var content := make_scroll_page()
 	content.add_child(build_profile_card())
+	content.add_child(build_origin_card())
 	content.add_child(build_stats_card())
 
 	if bool(simulation.data.get("alive", true)):
@@ -246,24 +251,42 @@ func build_profile_card() -> Control:
 	var avatar := StoryAvatar.new()
 	avatar.custom_minimum_size = Vector2(170, 170)
 	var stats: Dictionary = simulation.data.get("stats", {})
-	avatar.set_profile(int(simulation.data.get("age", 0)), int(stats.get("health", 0)), int(stats.get("happiness", 0)))
+	avatar.set_profile(int(simulation.data.get("age", 0)), int(stats.get("health", 0)), int(stats.get("happiness", 0)), simulation.data.get("appearance", {}))
 	avatar_shell.add_child(avatar)
 
 	var details := VBoxContainer.new()
 	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	details.add_theme_constant_override("separation", 5)
 	row.add_child(details)
-	var full_name := "%s %s" % [str(simulation.data.get("first_name", "Austin")), str(simulation.data.get("last_name", "Dagenais"))]
+	var full_name := "%s %s" % [str(simulation.data.get("first_name", "Alex")), str(simulation.data.get("last_name", "Morgan"))]
 	var name_label := make_label(full_name, 27, TEXT, 900)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	details.add_child(name_label)
-	details.add_child(make_label(str(simulation.data.get("birthplace", "Kelowna, British Columbia")), 13, MUTED, 500))
+	details.add_child(make_label("%s • %s" % [str(simulation.data.get("identity", "Person")), str(simulation.data.get("pronouns", "they/them"))], 12, TEAL, 700))
+	details.add_child(make_label("Born %s %d in %s" % [str(simulation.data.get("birth_month", "January")), int(simulation.data.get("birth_day", 1)), str(simulation.data.get("birthplace", "Halifax, Nova Scotia"))], 12, MUTED, 500))
 	details.add_child(make_divider())
 	var job: Dictionary = simulation.data.get("job", {})
 	var role := "Retired" if bool(simulation.data.get("retired", false)) else str(job.get("title", "Growing up" if int(simulation.data.get("age", 0)) < 18 else "Between jobs"))
 	details.add_child(make_key_value("CURRENT", role, TEAL))
 	details.add_child(make_key_value("EDUCATION", str(simulation.data.get("education_label", "At home")), BLUE))
 	details.add_child(make_key_value("BALANCE", simulation.format_money(int(simulation.data.get("balance", 0))), GOLD if int(simulation.data.get("balance", 0)) >= 0 else ROSE))
+	return panel
+
+
+func build_origin_card() -> Control:
+	var panel := make_panel(Color("102238"), 20, 1, LINE)
+	var margin := MarginContainer.new()
+	set_margins(margin, 17, 14, 17, 14)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 7)
+	margin.add_child(box)
+	box.add_child(make_label("PROCEDURAL ORIGIN", 13, TEAL, 800))
+	var background: Dictionary = simulation.data.get("background", {})
+	box.add_child(make_key_value("HOUSEHOLD", str(background.get("household", "A unique household")), TEXT))
+	box.add_child(make_key_value("CHILDHOOD", str(background.get("childhood_trait", "Curious")), BLUE))
+	box.add_child(make_key_value("TRADITION", str(background.get("family_tradition", "Family time")), GOLD))
+	box.add_child(make_key_value("LIFE SEED", str(absi(int(simulation.data.get("life_seed", 0)))), MUTED))
 	return panel
 
 
@@ -407,6 +430,19 @@ func build_relationship_card(relationship: Dictionary) -> Control:
 	header.add_child(name)
 	var value := int(relationship.get("value", 50))
 	header.add_child(make_label("%d%%" % value, 15, TEAL if value >= 50 else ROSE, 800))
+	var details_parts: Array[String] = []
+	if relationship.has("relation"):
+		details_parts.append(str(relationship.get("relation", "Relationship")))
+	if relationship.has("age"):
+		details_parts.append("Age %d" % int(relationship.get("age", 0)))
+	if relationship.has("job"):
+		details_parts.append(str(relationship.get("job", "")))
+	if relationship.has("personality"):
+		details_parts.append(str(relationship.get("personality", "")))
+	if not details_parts.is_empty():
+		var relationship_details := make_label(" • ".join(PackedStringArray(details_parts)), 12, MUTED, 500)
+		relationship_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(relationship_details)
 	var bar := ProgressBar.new()
 	bar.max_value = 100
 	bar.value = value
@@ -484,6 +520,13 @@ func build_current_work_card() -> Control:
 		progress.add_theme_stylebox_override("fill", make_style(GOLD, 6))
 		box.add_child(progress)
 		box.add_child(make_label("%d%% toward your next career level" % int(simulation.data.get("job_progress", 0)), 12, MUTED, 600))
+		var shift_button := make_button("WORK A REALISTIC SHIFT", "primary", 14)
+		shift_button.custom_minimum_size.y = 58
+		shift_button.disabled = int(simulation.data.get("work_shift_year", -1)) == int(simulation.data.get("year", 2026))
+		shift_button.text = "SHIFT COMPLETE THIS YEAR" if shift_button.disabled else "WORK A REALISTIC SHIFT"
+		shift_button.pressed.connect(on_work_shift)
+		box.add_child(shift_button)
+		box.add_child(make_label("Every one of the %s careers receives role- and sector-specific decisions." % format_number(CareerCatalog.count()), 11, MUTED, 500))
 	return panel
 
 
@@ -620,6 +663,112 @@ func build_job_card(job: Dictionary) -> Control:
 	return panel
 
 
+func build_sports_page() -> void:
+	var content := make_scroll_page()
+	content.add_child(make_page_intro("SCHOOL-TO-PRO SPORTS", "%d complete development pathways begin in youth clubs or school and can lead to a professional contract." % SportsSystem.sports().size()))
+	var sports: Dictionary = simulation.data.get("sports", {})
+	if str(sports.get("sport_id", "")).is_empty():
+		content.add_child(build_sports_pathway_intro())
+		content.add_child(make_section_label("CHOOSE ONE DEVELOPMENT PATH"))
+		for sport in SportsSystem.sports():
+			content.add_child(build_sport_catalog_card(sport))
+		return
+	content.add_child(build_active_sports_card(sports))
+	content.add_child(make_section_label("ANNUAL DEVELOPMENT"))
+	var training_row := HBoxContainer.new()
+	training_row.add_theme_constant_override("separation", 7)
+	content.add_child(training_row)
+	for training in [["PHYSICAL", "physical"], ["TECHNICAL", "technical"], ["FILM / IQ", "film"]]:
+		var training_button := make_button(str(training[0]), "secondary", 11)
+		training_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		training_button.custom_minimum_size.y = 55
+		training_button.disabled = int(sports.get("last_training_year", -1)) == int(simulation.data.get("year", 2026)) or bool(sports.get("retired", false))
+		training_button.pressed.connect(on_sports_training.bind(str(training[1])))
+		training_row.add_child(training_button)
+	var season_button := make_button("PLAY THIS SEASON", "primary", 17)
+	season_button.custom_minimum_size.y = 68
+	season_button.disabled = not SportsSystem.can_play_season(sports, int(simulation.data.get("year", 2026)))
+	season_button.text = "SEASON COMPLETE" if season_button.disabled and not bool(sports.get("retired", false)) else ("ATHLETIC CAREER COMPLETE" if bool(sports.get("retired", false)) else "PLAY THIS SEASON")
+	season_button.pressed.connect(on_sports_season)
+	content.add_child(season_button)
+	content.add_child(make_empty_card("THE PATHWAY", "Youth development leads to school/academy competition at 12. At 18, ratings determine college, elite, or amateur placement. Strong performance from age 21 can produce a fictional professional roster contract; developmental leagues offer a later route."))
+
+
+func build_sports_pathway_intro() -> Control:
+	var panel := make_panel(SURFACE_RAISED, 22, 1, Color("35677a"))
+	var margin := MarginContainer.new()
+	set_margins(margin, 18, 16, 18, 16)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	margin.add_child(box)
+	box.add_child(make_label("ONE SPORT. ONE LONG ROAD.", 18, TEXT, 800))
+	var body := make_label("Join before age 18, train once per year, and play a three-decision season. Skill, fitness, game IQ, reputation, wins, championships, and scouting transitions all persist in your life save.", 13, MUTED, 500)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(body)
+	box.add_child(make_key_value("CURRENT AGE", str(simulation.data.get("age", 0)), GOLD))
+	box.add_child(make_key_value("ENTRY WINDOW", "Youth / school years", TEAL))
+	return panel
+
+
+func build_sport_catalog_card(sport: Dictionary) -> Control:
+	var panel := make_panel(SURFACE, 18, 1, LINE)
+	var margin := MarginContainer.new()
+	set_margins(margin, 16, 13, 16, 13)
+	panel.add_child(margin)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	margin.add_child(row)
+	var details := VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 4)
+	row.add_child(details)
+	details.add_child(make_label(str(sport.get("name", "Sport")), 18, TEXT, 800))
+	var positions: Array = sport.get("positions", [])
+	var position_names: Array[String] = []
+	for position in positions:
+		position_names.append(str(position))
+	var position_text := ", ".join(PackedStringArray(position_names.slice(0, mini(3, position_names.size()))))
+	if positions.size() > 3:
+		position_text += " +%d more" % (positions.size() - 3)
+	var subtitle := make_label("Starts age %d • %s" % [int(sport.get("start_age", 6)), position_text], 11, MUTED, 500)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details.add_child(subtitle)
+	details.add_child(make_label("Youth → school → college/development → professional", 11, TEAL, 700))
+	var join_button := make_button("JOIN", "secondary", 12)
+	join_button.custom_minimum_size = Vector2(102, 54)
+	var age := int(simulation.data.get("age", 0))
+	join_button.disabled = age < int(sport.get("start_age", 6)) or age > 17
+	join_button.pressed.connect(on_sport_join.bind(str(sport.get("id", ""))))
+	row.add_child(join_button)
+	return panel
+
+
+func build_active_sports_card(sports: Dictionary) -> Control:
+	var panel := make_panel(SURFACE_RAISED, 23, 1, Color("426873"))
+	var margin := MarginContainer.new()
+	set_margins(margin, 19, 17, 19, 17)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 9)
+	margin.add_child(box)
+	box.add_child(make_label(str(sports.get("sport_name", "SPORT")).to_upper(), 24, TEXT, 900))
+	box.add_child(make_label("%s • %s" % [str(sports.get("team", "Development team")), str(sports.get("position", "Competitor"))], 14, TEAL, 700))
+	box.add_child(make_divider())
+	box.add_child(make_key_value("LEVEL", SportsSystem.stage_label(str(sports.get("stage", "none"))), BLUE))
+	box.add_child(make_key_value("ATHLETE RATING", "%d OVR" % SportsSystem.athlete_rating(sports), GOLD))
+	box.add_child(make_key_value("SKILL / FITNESS", "%d / %d" % [int(sports.get("skill", 0)), int(sports.get("fitness", 0))], TEXT))
+	box.add_child(make_key_value("GAME IQ / REP", "%d / %d" % [int(sports.get("game_iq", 0)), int(sports.get("reputation", 0))], TEXT))
+	box.add_child(make_key_value("CAREER RECORD", "%d–%d" % [int(sports.get("wins", 0)), int(sports.get("losses", 0))], TEAL))
+	box.add_child(make_key_value("SEASONS / TITLES", "%d / %d" % [int(sports.get("seasons", 0)), int(sports.get("championships", 0))], GOLD))
+	var draft_result := str(sports.get("draft_result", ""))
+	if not draft_result.is_empty():
+		var draft_label := make_label(draft_result, 12, GOLD, 700)
+		draft_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(draft_label)
+	return panel
+
+
 func build_activities_page() -> void:
 	var content := make_scroll_page()
 	content.add_child(make_page_intro("ACTIVITIES", "Each activity can be completed once per year."))
@@ -732,6 +881,116 @@ func on_program_enroll(program_id: String) -> void:
 	show_page("work")
 
 
+func on_work_shift() -> void:
+	var session := simulation.create_work_session()
+	if not bool(session.get("ok", false)):
+		show_toast(str(session.get("message", "A shift is not available.")))
+		return
+	start_minigame(session)
+
+
+func on_sport_join(sport_id: String) -> void:
+	var result := simulation.join_sport(sport_id)
+	show_toast(str(result.get("message", "")), bool(result.get("ok", false)))
+	show_page("sports")
+
+
+func on_sports_training(action: String) -> void:
+	var result := simulation.sports_train(action)
+	show_toast(str(result.get("message", "")), bool(result.get("ok", false)))
+	show_page("sports")
+
+
+func on_sports_season() -> void:
+	var session := simulation.create_sports_session()
+	if not bool(session.get("ok", false)):
+		show_toast(str(session.get("message", "A season is not available.")))
+		return
+	start_minigame(session)
+
+
+func start_minigame(session: Dictionary) -> void:
+	active_minigame = session.duplicate(true)
+	active_minigame["round_index"] = 0
+	active_minigame["score"] = 0
+	show_minigame_round()
+
+
+func show_minigame_round() -> void:
+	var rounds: Array = active_minigame.get("rounds", [])
+	var round_index := int(active_minigame.get("round_index", 0))
+	if round_index >= rounds.size():
+		finish_minigame()
+		return
+	close_overlay()
+	overlay = ColorRect.new()
+	overlay.color = Color(0.015, 0.03, 0.05, 0.92)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = 100
+	add_child(overlay)
+	var dialog_layout := make_overlay_scroll(overlay, 34, 42, 34, 36)
+	var center := dialog_layout.get("center") as CenterContainer
+	var card := make_panel(Color("14293d"), 28, 2, TEAL)
+	card.custom_minimum_size.x = 628
+	center.add_child(card)
+	var margin := MarginContainer.new()
+	set_margins(margin, 26, 23, 26, 23)
+	card.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	margin.add_child(box)
+	var score := int(active_minigame.get("score", 0))
+	box.add_child(make_label("%s • DECISION %d / %d • SCORE %d" % [str(active_minigame.get("kind", "work")).to_upper(), round_index + 1, rounds.size(), score], 12, TEAL, 800))
+	var title := make_label(str(active_minigame.get("title", "MINIGAME")), 26, TEXT, 900)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(title)
+	var subtitle := make_label(str(active_minigame.get("subtitle", "")), 13, GOLD, 700)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(subtitle)
+	box.add_child(make_divider())
+	var round_data: Dictionary = rounds[round_index]
+	var prompt := make_label(str(round_data.get("prompt", "Choose the best response.")), 17, Color("d5e2ea"), 600)
+	prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	prompt.add_theme_constant_override("line_spacing", 5)
+	box.add_child(prompt)
+	var options: Array = round_data.get("options", [])
+	for option_index in range(options.size()):
+		var answer := make_button(str(options[option_index]), "choice", 15)
+		answer.custom_minimum_size.y = 72
+		answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		answer.pressed.connect(answer_minigame.bind(option_index))
+		box.add_child(answer)
+	box.add_child(make_label("Choose the safest, most realistic professional decision.", 11, MUTED, 500))
+
+
+func answer_minigame(option_index: int) -> void:
+	var rounds: Array = active_minigame.get("rounds", [])
+	var round_index := int(active_minigame.get("round_index", 0))
+	if round_index < 0 or round_index >= rounds.size():
+		return
+	var round_data: Dictionary = rounds[round_index]
+	if option_index == int(round_data.get("correct_index", -1)):
+		active_minigame["score"] = int(active_minigame.get("score", 0)) + 1
+	active_minigame["round_index"] = round_index + 1
+	show_minigame_round()
+
+
+func finish_minigame() -> void:
+	var kind := str(active_minigame.get("kind", "work"))
+	var score := int(active_minigame.get("score", 0))
+	var total := active_minigame.get("rounds", []).size()
+	var result: Dictionary
+	if kind == "sports":
+		result = simulation.complete_sports_session(score, total)
+	else:
+		result = simulation.complete_work_session(score, total)
+	active_minigame = {}
+	close_overlay()
+	show_page("sports" if kind == "sports" else "work")
+	show_toast(str(result.get("message", "Minigame complete.")), bool(result.get("ok", false)))
+
+
 func on_career_search(search: LineEdit, sector_select: OptionButton) -> void:
 	career_query = search.text.strip_edges()
 	career_sector = sector_select.get_item_text(sector_select.selected)
@@ -837,13 +1096,18 @@ func show_new_life_dialog() -> void:
 	box.add_theme_constant_override("separation", 14)
 	margin.add_child(box)
 	box.add_child(make_label("BEGIN A NEW LIFE", 27, TEXT, 900))
-	var warning := make_label("Starting again replaces the current local save, but the finished timeline will remain yours until you confirm.", 14, MUTED, 500)
+	var warning := make_label("Every new story generates a new name, family, birthplace, background, childhood history, and portrait DNA. Edit the suggested name or reroll it; confirming replaces the current local save.", 14, MUTED, 500)
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(warning)
-	var first_input := make_line_edit(str(simulation.data.get("first_name", "Austin")), "First name")
+	var preview := LifeGenerator.random_identity_preview()
+	var first_input := make_line_edit(str(preview.get("first_name", "Alex")), "First name")
 	box.add_child(first_input)
-	var last_input := make_line_edit(str(simulation.data.get("last_name", "Dagenais")), "Last name")
+	var last_input := make_line_edit(str(preview.get("last_name", "Morgan")), "Last name")
 	box.add_child(last_input)
+	var reroll := make_button("REROLL NAME & CHARACTER", "secondary", 14)
+	reroll.custom_minimum_size.y = 56
+	reroll.pressed.connect(reroll_new_character.bind(first_input, last_input))
+	box.add_child(reroll)
 	var start := make_button("START NEW STORY", "primary", 16)
 	start.custom_minimum_size.y = 62
 	start.pressed.connect(start_new_life.bind(first_input, last_input))
@@ -853,6 +1117,15 @@ func show_new_life_dialog() -> void:
 	cancel.pressed.connect(close_overlay)
 	box.add_child(cancel)
 	box.add_child(make_keyboard_spacer(dialog_scroll, 0))
+
+
+func reroll_new_character(first_input: LineEdit, last_input: LineEdit) -> void:
+	var preview := LifeGenerator.random_identity_preview()
+	first_input.text = str(preview.get("first_name", "Alex"))
+	last_input.text = str(preview.get("last_name", "Morgan"))
+	first_input.release_focus()
+	last_input.release_focus()
+	DisplayServer.virtual_keyboard_hide()
 
 
 func start_new_life(first_input: LineEdit, last_input: LineEdit) -> void:
