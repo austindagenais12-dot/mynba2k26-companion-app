@@ -12,6 +12,7 @@ const GOLD := Color("ffb65b")
 const ROSE := Color("ef7184")
 const BLUE := Color("5ea9dd")
 const LINE := Color("29465e")
+const CAREERS_PER_PAGE := 14
 
 var simulation: LifeSimulation
 var current_page := "life"
@@ -22,6 +23,10 @@ var overlay: ColorRect
 var toast_panel: PanelContainer
 var toast_label: Label
 var toast_serial := 0
+var career_query := ""
+var career_sector := "All sectors"
+var career_eligible_only := false
+var career_page := 0
 
 
 func _ready() -> void:
@@ -312,6 +317,7 @@ func build_history_card(entry: Dictionary) -> Control:
 		"teal": accent = TEAL
 		"gold": accent = GOLD
 		"rose": accent = ROSE
+		"blue": accent = BLUE
 	var panel := make_panel(Color("102238"), 18, 1, Color(accent, 0.52))
 	var margin := MarginContainer.new()
 	set_margins(margin, 16, 13, 16, 13)
@@ -410,11 +416,30 @@ func build_relationship_card(relationship: Dictionary) -> Control:
 
 func build_work_page() -> void:
 	var content := make_scroll_page()
-	content.add_child(make_page_intro("WORK & EDUCATION", "Build qualifications, take chances, and shape a career."))
+	content.add_child(make_page_intro("WORK & EDUCATION", "Search %s realistic career options across %d sectors." % [format_number(CareerCatalog.count()), CareerCatalog.sectors().size()]))
 	content.add_child(build_current_work_card())
-	content.add_child(make_section_label("OPPORTUNITIES"))
-	for job in EventCatalog.jobs():
-		content.add_child(build_job_card(job))
+	content.add_child(make_section_label("EDUCATION PATHS"))
+	content.add_child(build_education_card())
+	content.add_child(make_section_label("CAREER EXPLORER"))
+	content.add_child(build_career_filters())
+	var education_limit := int(simulation.data.get("education", 0)) if career_eligible_only else -1
+	var results := CareerCatalog.filter_jobs(career_query, career_sector, education_limit)
+	var page_count := maxi(1, int(ceil(float(results.size()) / float(CAREERS_PER_PAGE))))
+	career_page = clampi(career_page, 0, page_count - 1)
+	var start_index := career_page * CAREERS_PER_PAGE
+	var end_index := mini(results.size(), start_index + CAREERS_PER_PAGE)
+	var result_header := HBoxContainer.new()
+	content.add_child(result_header)
+	var result_count := make_label("%s MATCHES" % format_number(results.size()), 13, TEAL, 800)
+	result_count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	result_header.add_child(result_count)
+	result_header.add_child(make_label("PAGE %d / %d" % [career_page + 1, page_count], 12, MUTED, 700))
+	if results.is_empty():
+		content.add_child(make_empty_card("No careers matched", "Try a broader title, workplace, or sector."))
+	else:
+		for index in range(start_index, end_index):
+			content.add_child(build_job_card(results[index]))
+	content.add_child(build_career_pagination(page_count))
 
 
 func build_current_work_card() -> Control:
@@ -430,6 +455,9 @@ func build_current_work_card() -> Control:
 	var job: Dictionary = simulation.data.get("job", {})
 	var job_title := "Retired" if bool(simulation.data.get("retired", false)) else str(job.get("title", "Not employed"))
 	box.add_child(make_key_value("POSITION", job_title, TEXT))
+	if not job.is_empty():
+		box.add_child(make_key_value("CAREER RANK", str(job.get("rank", "Entry")), BLUE))
+		box.add_child(make_key_value("SECTOR", str(job.get("sector", "General")), MUTED))
 	box.add_child(make_key_value("ANNUAL PAY", simulation.format_money(int(job.get("salary", 0))) if not job.is_empty() else "$0", GOLD))
 	if not job.is_empty() and not bool(simulation.data.get("retired", false)):
 		var progress := ProgressBar.new()
@@ -444,6 +472,111 @@ func build_current_work_card() -> Control:
 	return panel
 
 
+func build_education_card() -> Control:
+	var panel := make_panel(SURFACE, 20, 1, LINE)
+	var margin := MarginContainer.new()
+	set_margins(margin, 17, 15, 17, 15)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	margin.add_child(box)
+	var current_level := int(simulation.data.get("education", 0))
+	box.add_child(make_key_value("CURRENT LEVEL", CareerCatalog.education_label(current_level), BLUE))
+	var active: Dictionary = simulation.data.get("education_program", {})
+	if not active.is_empty():
+		box.add_child(make_key_value("ENROLLED", str(active.get("title", "Program")), TEAL))
+		box.add_child(make_key_value("TIME LEFT", "%d years" % int(active.get("years_left", 0)), GOLD))
+		box.add_child(make_key_value("YEARLY TUITION", simulation.format_money(int(active.get("annual_cost", 0))), ROSE))
+		var note := make_label("Study progresses automatically whenever you age up.", 12, MUTED, 500)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(note)
+		return panel
+	for program in CareerCatalog.education_programs():
+		box.add_child(build_program_row(program, current_level))
+	return panel
+
+
+func build_program_row(program: Dictionary, current_level: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var details := VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 2)
+	row.add_child(details)
+	details.add_child(make_label(str(program.get("title", "Program")), 15, TEXT, 800))
+	var summary := "%d years • %s/year • %s" % [int(program.get("years", 1)), simulation.format_money(int(program.get("annual_cost", 0))), str(program.get("subtitle", ""))]
+	var summary_label := make_label(summary, 11, MUTED, 500)
+	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details.add_child(summary_label)
+	var button := make_button("ENROLL", "secondary", 11)
+	button.custom_minimum_size = Vector2(94, 48)
+	button.disabled = current_level < int(program.get("requires", 0)) or current_level >= int(program.get("target", 0)) or int(simulation.data.get("age", 0)) < 18
+	button.pressed.connect(on_program_enroll.bind(str(program.get("id", ""))))
+	row.add_child(button)
+	return row
+
+
+func build_career_filters() -> Control:
+	var panel := make_panel(SURFACE_RAISED, 20, 1, Color("35677a"))
+	var margin := MarginContainer.new()
+	set_margins(margin, 15, 14, 15, 14)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 9)
+	margin.add_child(box)
+	var search := make_line_edit(career_query, "Search nurse, welder, artist, pilot…")
+	search.text = career_query
+	box.add_child(search)
+	var filter_row := HBoxContainer.new()
+	filter_row.add_theme_constant_override("separation", 8)
+	box.add_child(filter_row)
+	var sector_select := OptionButton.new()
+	sector_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sector_select.custom_minimum_size.y = 54
+	sector_select.add_theme_font_size_override("font_size", 13)
+	sector_select.add_theme_color_override("font_color", TEXT)
+	sector_select.add_theme_stylebox_override("normal", make_style(Color("0d1d2d"), 14, 1, LINE))
+	sector_select.add_item("All sectors")
+	for sector_name in CareerCatalog.sectors():
+		sector_select.add_item(str(sector_name))
+	for index in range(sector_select.item_count):
+		if sector_select.get_item_text(index) == career_sector:
+			sector_select.select(index)
+			break
+	filter_row.add_child(sector_select)
+	var search_button := make_button("SEARCH", "primary", 12)
+	search_button.custom_minimum_size = Vector2(112, 54)
+	search_button.pressed.connect(on_career_search.bind(search, sector_select))
+	filter_row.add_child(search_button)
+	var eligible := CheckButton.new()
+	eligible.text = "Only show careers my education currently qualifies for"
+	eligible.button_pressed = career_eligible_only
+	eligible.add_theme_font_size_override("font_size", 12)
+	eligible.add_theme_color_override("font_color", MUTED)
+	box.add_child(eligible)
+	eligible.toggled.connect(on_career_eligible_toggled)
+	search.text_submitted.connect(on_career_text_submitted.bind(search, sector_select))
+	return panel
+
+
+func build_career_pagination(page_count: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var previous := make_button("PREVIOUS", "secondary", 13)
+	previous.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	previous.custom_minimum_size.y = 54
+	previous.disabled = career_page <= 0
+	previous.pressed.connect(on_career_page.bind(-1))
+	row.add_child(previous)
+	var next := make_button("NEXT", "secondary", 13)
+	next.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	next.custom_minimum_size.y = 54
+	next.disabled = career_page >= page_count - 1
+	next.pressed.connect(on_career_page.bind(1))
+	row.add_child(next)
+	return row
+
+
 func build_job_card(job: Dictionary) -> Control:
 	var panel := make_panel(SURFACE, 18, 1, LINE)
 	var margin := MarginContainer.new()
@@ -456,9 +589,12 @@ func build_job_card(job: Dictionary) -> Control:
 	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	details.add_theme_constant_override("separation", 4)
 	row.add_child(details)
-	details.add_child(make_label(str(job.get("title", "Job")), 17, TEXT, 800))
+	var title_label := make_label(str(job.get("title", "Job")), 17, TEXT, 800)
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details.add_child(title_label)
 	details.add_child(make_label("%s / year" % simulation.format_money(int(job.get("salary", 0))), 14, GOLD, 700))
-	var requirement := "Age %d • Education %d • %s %d" % [int(job.get("min_age", 18)), int(job.get("education", 0)), str(job.get("stat", "smarts")).capitalize(), int(job.get("minimum", 0))]
+	details.add_child(make_label(str(job.get("sector", "General")), 11, TEAL, 700))
+	var requirement := "Age %d • %s • %s %d" % [int(job.get("min_age", 18)), CareerCatalog.education_short_label(int(job.get("education", 0))), str(job.get("stat", "smarts")).capitalize(), int(job.get("minimum", 0))]
 	details.add_child(make_label(requirement, 11, MUTED, 500))
 	var apply := make_button("APPLY", "secondary", 12)
 	apply.custom_minimum_size = Vector2(105, 52)
@@ -570,6 +706,34 @@ func on_relationship_action(key: String, action: String) -> void:
 func on_job_apply(job_id: String) -> void:
 	var result := simulation.apply_for_job(job_id)
 	show_toast(str(result.get("message", "")), bool(result.get("ok", false)))
+	show_page("work")
+
+
+func on_program_enroll(program_id: String) -> void:
+	var result := simulation.enroll_education(program_id)
+	show_toast(str(result.get("message", "")), bool(result.get("ok", false)))
+	show_page("work")
+
+
+func on_career_search(search: LineEdit, sector_select: OptionButton) -> void:
+	career_query = search.text.strip_edges()
+	career_sector = sector_select.get_item_text(sector_select.selected)
+	career_page = 0
+	show_page("work")
+
+
+func on_career_text_submitted(_submitted: String, search: LineEdit, sector_select: OptionButton) -> void:
+	on_career_search(search, sector_select)
+
+
+func on_career_eligible_toggled(enabled: bool) -> void:
+	career_eligible_only = enabled
+	career_page = 0
+	show_page("work")
+
+
+func on_career_page(direction: int) -> void:
+	career_page = maxi(0, career_page + direction)
 	show_page("work")
 
 
@@ -853,6 +1017,15 @@ func make_line_edit(default_text: String, placeholder: String) -> LineEdit:
 	input.add_theme_stylebox_override("normal", make_style(Color("0d1d2d"), 14, 1, LINE))
 	input.add_theme_stylebox_override("focus", make_style(Color("10283a"), 14, 2, TEAL))
 	return input
+
+
+func format_number(value: int) -> String:
+	var digits := str(absi(value))
+	var formatted := ""
+	while digits.length() > 3:
+		formatted = "," + digits.right(3) + formatted
+		digits = digits.left(digits.length() - 3)
+	return digits + formatted
 
 
 func set_margins(container: MarginContainer, left: int, top: int, right: int, bottom: int) -> void:

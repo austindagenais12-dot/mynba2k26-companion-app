@@ -38,6 +38,7 @@ func new_life(first_name: String = "Austin", last_name: String = "Dagenais") -> 
 		"education": 0,
 		"education_label": "At home",
 		"education_path": "",
+		"education_program": {},
 		"stats": {
 			"health": 84,
 			"happiness": 78,
@@ -147,13 +148,15 @@ func perform_activity(activity_id: String) -> Dictionary:
 
 
 func apply_for_job(job_id: String) -> Dictionary:
-	var job := EventCatalog.find_job(job_id)
+	var job := CareerCatalog.find_job(job_id)
+	if job.is_empty():
+		job = EventCatalog.find_job(job_id)
 	if job.is_empty():
 		return {"ok": false, "message": "That job is unavailable."}
 	if int(data.get("age", 0)) < int(job.get("min_age", 18)):
 		return {"ok": false, "message": "You are too young for this position."}
 	if int(data.get("education", 0)) < int(job.get("education", 0)):
-		return {"ok": false, "message": "You do not meet the education requirement."}
+		return {"ok": false, "message": "Requires %s." % CareerCatalog.education_short_label(int(job.get("education", 0)))}
 	var stats: Dictionary = data.get("stats", {})
 	var stat_key := str(job.get("stat", "smarts"))
 	var stat_value := int(stats.get(stat_key, 0))
@@ -173,6 +176,29 @@ func apply_for_job(job_id: String) -> Dictionary:
 	_add_history("Job application", "The employer chose another candidate. You gained interview experience.", "neutral")
 	save_game()
 	return {"ok": false, "message": "They selected another candidate."}
+
+
+func enroll_education(program_id: String) -> Dictionary:
+	if not bool(data.get("alive", false)):
+		return {"ok": false, "message": "This life has ended."}
+	if int(data.get("age", 0)) < 18:
+		return {"ok": false, "message": "Postsecondary study unlocks at age 18."}
+	if not data.get("education_program", {}).is_empty():
+		return {"ok": false, "message": "You are already enrolled in a program."}
+	var program := CareerCatalog.find_program(program_id)
+	if program.is_empty():
+		return {"ok": false, "message": "Program not found."}
+	var current_level := int(data.get("education", 0))
+	if current_level < int(program.get("requires", 0)):
+		return {"ok": false, "message": "Complete %s first." % CareerCatalog.education_short_label(int(program.get("requires", 0)))}
+	if current_level >= int(program.get("target", 0)):
+		return {"ok": false, "message": "You already hold an equal or higher credential."}
+	program["years_left"] = int(program.get("years", 1))
+	data["education_program"] = program
+	data["education_label"] = "%s — %d years left" % [str(program.get("title", "Program")), int(program.get("years_left", 1))]
+	_add_history("Enrolled: %s" % str(program.get("title", "Program")), "You committed to a new education path and its yearly tuition costs.", "blue")
+	save_game()
+	return {"ok": true, "message": "Enrollment confirmed."}
 
 
 func relationship_action(key: String, action: String) -> Dictionary:
@@ -284,7 +310,7 @@ func save_game() -> bool:
 	if file == null:
 		return false
 	var payload := {
-		"version": 1,
+		"version": 2,
 		"data": data,
 		"pending_event": pending_event,
 		"recent_event_ids": recent_event_ids,
@@ -307,6 +333,8 @@ func load_game() -> bool:
 	if not payload.get("data", {}) is Dictionary:
 		return false
 	data = payload.get("data", {}).duplicate(true)
+	if not data.has("education_program"):
+		data["education_program"] = {}
 	pending_event = payload.get("pending_event", {}).duplicate(true)
 	recent_event_ids = payload.get("recent_event_ids", []).duplicate()
 	if payload.has("rng_state"):
@@ -345,10 +373,30 @@ func _process_school() -> void:
 			data["education_label"] = "Bachelor's Degree"
 			_add_history("University graduation", "You completed your degree and stepped into a wider job market.", "gold")
 	elif str(data.get("education_path", "")) == "trade" and age == 21:
-		data["education"] = 1
+		data["education"] = 2
 		data["education_label"] = "Electrical Trade Certificate"
 		data["job"] = {"id": "electrician", "title": "Electrician", "salary": 73000, "level": 1}
 		_add_history("Trade certification", "You completed your apprenticeship and qualified as an electrician.", "gold")
+	_process_active_education_program()
+
+
+func _process_active_education_program() -> void:
+	var program: Dictionary = data.get("education_program", {})
+	if program.is_empty():
+		return
+	data["balance"] = int(data.get("balance", 0)) - int(program.get("annual_cost", 0))
+	data["stats"]["smarts"] = clampi(int(data["stats"].get("smarts", 50)) + 4, 0, 100)
+	data["stats"]["discipline"] = clampi(int(data["stats"].get("discipline", 50)) + 2, 0, 100)
+	program["years_left"] = int(program.get("years_left", 1)) - 1
+	if int(program.get("years_left", 0)) <= 0:
+		var target := int(program.get("target", int(data.get("education", 0))))
+		data["education"] = maxi(int(data.get("education", 0)), target)
+		data["education_label"] = str(program.get("title", CareerCatalog.education_label(target)))
+		_add_history("Graduated: %s" % str(program.get("title", "Advanced program")), "Years of study opened an entirely new level of career opportunities.", "gold")
+		data["education_program"] = {}
+	else:
+		data["education_label"] = "%s — %d years left" % [str(program.get("title", "Program")), int(program.get("years_left", 1))]
+		data["education_program"] = program
 
 
 func _process_career() -> void:
@@ -359,8 +407,7 @@ func _process_career() -> void:
 	data["job_progress"] = int(data.get("job_progress", 0)) + rng.randi_range(2, 6) + int(float(data["stats"].get("discipline", 50)) / 25.0)
 	if int(data.get("job_progress", 0)) >= 100:
 		data["job_progress"] = int(data.get("job_progress", 0)) - 100
-		job["level"] = int(job.get("level", 1)) + 1
-		job["salary"] = int(round(float(job.get("salary", 0)) * 1.08))
+		job = CareerCatalog.promote(job)
 		data["job"] = job
 		_add_history("Career progress", "Consistent work earned you a raise and greater responsibility.", "teal")
 
@@ -541,7 +588,9 @@ func _apply_effects(effects: Dictionary) -> void:
 
 
 func _set_job(job_id: String) -> void:
-	var job := EventCatalog.find_job(job_id)
+	var job := CareerCatalog.find_job(job_id)
+	if job.is_empty():
+		job = EventCatalog.find_job(job_id)
 	if job.is_empty():
 		if job_id == "electrician":
 			job = {"id": "electrician", "title": "Electrician", "salary": 73000}

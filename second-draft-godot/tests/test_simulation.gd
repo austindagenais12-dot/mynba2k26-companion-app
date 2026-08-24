@@ -25,6 +25,31 @@ func _initialize() -> void:
 	if simulation.data.get("history", []).size() < 25:
 		failures.append("Life timeline did not record enough moments.")
 
+	var enrollment := simulation.enroll_education("masters_degree")
+	if not bool(enrollment.get("ok", false)):
+		failures.append("Eligible graduate enrollment failed.")
+	for target_age in range(31, 33):
+		var study_event := simulation.age_up()
+		if not study_event.is_empty():
+			simulation.resolve_choice(0)
+	if int(simulation.data.get("education", 0)) < 3:
+		failures.append("Master's program did not complete after two years.")
+
+	var software_jobs := CareerCatalog.filter_jobs("Software Developer", "Software & IT", 3)
+	if software_jobs.is_empty():
+		failures.append("Could not find a real-world software career for application testing.")
+	else:
+		for key in LifeSimulation.STAT_KEYS:
+			simulation.data["stats"][key] = 100
+		var hired := false
+		for attempt in range(8):
+			var application := simulation.apply_for_job(str(software_jobs[0].get("id", "")))
+			if bool(application.get("ok", false)):
+				hired = true
+				break
+		if not hired or str(simulation.data.get("job", {}).get("sector", "")) != "Software & IT":
+			failures.append("Career catalog job application did not integrate with the life save.")
+
 	var stats: Dictionary = simulation.data.get("stats", {})
 	for key in LifeSimulation.STAT_KEYS:
 		var value := int(stats.get(key, -1))
@@ -43,7 +68,7 @@ func _initialize() -> void:
 	var loaded := LifeSimulation.new(1)
 	if not loaded.load_game():
 		failures.append("Load operation failed.")
-	elif int(loaded.data.get("age", -1)) != 30 or str(loaded.data.get("first_name", "")) != "Austin":
+	elif int(loaded.data.get("age", -1)) != 32 or str(loaded.data.get("first_name", "")) != "Austin":
 		failures.append("Loaded data did not match the saved life.")
 
 	finish(failures, simulation)
@@ -51,10 +76,9 @@ func _initialize() -> void:
 
 func finish(failures: Array[String], simulation: LifeSimulation) -> void:
 	if failures.is_empty():
-		print("PASS: simulated 30 years with milestones, events, bounded stats, activities, timeline, and save/load. Score=%d" % simulation.life_score())
+		print("PASS: simulated 32 years with milestones, graduate education, catalog hiring, bounded stats, activities, timeline, and save/load. Score=%d" % simulation.life_score())
 		quit(0)
 		return
 	for failure in failures:
 		push_error(failure)
 	quit(1)
-
