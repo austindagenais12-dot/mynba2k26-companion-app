@@ -71,7 +71,7 @@ jobs:
             -dname "CN=Android Debug,O=Full Court Legacy,C=CA" \
             -noprompt
           printf '%s\n' \
-            '[gd_resource format=3]' \
+            '[gd_resource type="EditorSettings" format=3]' \
             '' \
             '[resource]' \
             "export/android/android_sdk_path = \"$ANDROID_HOME\"" \
@@ -87,14 +87,13 @@ jobs:
           set -euo pipefail
           godot --headless --editor --path full-court-legacy-godot --quit-after 4
           godot --headless --path full-court-legacy-godot --quit-after 20 2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
-          if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid assignment" "$RUNNER_TEMP/godot-smoke.log"; then
+          if grep -E "ERROR:|SCRIPT ERROR|Parse Error|Invalid call|Invalid assignment" "$RUNNER_TEMP/godot-smoke.log"; then
             exit 1
           fi
 
       - name: Export debug APK
         shell: bash
         env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.debug-keystore-placeholder
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
