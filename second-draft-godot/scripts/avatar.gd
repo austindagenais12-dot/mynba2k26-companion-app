@@ -103,8 +103,8 @@ func _draw() -> void:
 		draw_line(center + Vector2(-28, -7) * scale_value, center + Vector2(-8, -7) * scale_value, hair, 3.0 * scale_value, true)
 		draw_line(center + Vector2(8, -7) * scale_value, center + Vector2(28, -7) * scale_value, hair, 3.0 * scale_value, true)
 	else:
-		draw_ellipse(center + Vector2(-18, -7) * scale_value, Vector2(11, 7) * scale_value, cream)
-		draw_ellipse(center + Vector2(18, -7) * scale_value, Vector2(11, 7) * scale_value, cream)
+		draw_ellipse_shape(center + Vector2(-18, -7) * scale_value, Vector2(11, 7) * scale_value, cream)
+		draw_ellipse_shape(center + Vector2(18, -7) * scale_value, Vector2(11, 7) * scale_value, cream)
 		draw_circle(center + Vector2(-16, -7) * scale_value, 5.0 * scale_value, Color("293849"))
 		draw_circle(center + Vector2(16, -7) * scale_value, 5.0 * scale_value, Color("293849"))
 		draw_circle(center + Vector2(-14, -9) * scale_value, 1.6 * scale_value, cream)
@@ -125,7 +125,7 @@ func _draw() -> void:
 		draw_arc(center + Vector2(0, 0) * scale_value, 46.0 * scale_value, 0.0, TAU, 40, Color(0.65, 0.25, 0.32, 0.24), 3.0 * scale_value, true)
 
 
-func draw_ellipse(position: Vector2, radii: Vector2, color: Color) -> void:
+func draw_ellipse_shape(position: Vector2, radii: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()
 	for index in range(24):
 		var angle := TAU * float(index) / 24.0
