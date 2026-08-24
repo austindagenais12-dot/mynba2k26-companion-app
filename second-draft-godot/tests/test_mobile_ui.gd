@@ -107,6 +107,38 @@ func run_tests() -> void:
 	app.call("close_overlay")
 	await wait_frames(2)
 
+	app.call("show_page", "assets")
+	await wait_frames(3)
+	var asset_labels: Array[Label] = []
+	collect_labels(app.get("page_host") as Control, asset_labels)
+	var found_support := false
+	for label in asset_labels:
+		if label.text == "BUILD & DEVICE HELP":
+			found_support = true
+			break
+	if not found_support:
+		failures.append("The in-app installation and diagnostics panel is missing.")
+
+	var sequence_session := JobMinigame.create_session(CareerCatalog.all_jobs()[0], 246810)
+	sequence_session["round_index"] = 1
+	app.set("active_minigame", sequence_session)
+	app.call("show_minigame_round")
+	await wait_frames(2)
+	var sequence_rounds: Array = sequence_session.get("rounds", [])
+	var sequence_round: Dictionary = sequence_rounds[1]
+	var wrong_order: Array = sequence_round.get("correct_order", []).duplicate()
+	var first_step = wrong_order[0]
+	wrong_order[0] = wrong_order[1]
+	wrong_order[1] = first_step
+	for step in wrong_order:
+		app.call("answer_sequence_minigame", str(step))
+		await wait_frames(2)
+	var sequence_state: Dictionary = app.get("active_minigame")
+	if int(sequence_state.get("round_index", 0)) != 2:
+		failures.append("An incorrect ordering challenge did not advance to the next round.")
+	app.call("close_overlay")
+	await wait_frames(2)
+
 	finish(failures, app)
 
 
@@ -145,11 +177,20 @@ func collect_buttons(node: Node, results: Array[Button]) -> void:
 		collect_buttons(child, results)
 
 
+func collect_labels(node: Node, results: Array[Label]) -> void:
+	if node == null:
+		return
+	if node is Label:
+		results.append(node as Label)
+	for child in node.get_children():
+		collect_labels(child, results)
+
+
 func finish(failures: Array[String], app: Node) -> void:
 	if is_instance_valid(app):
 		app.queue_free()
 	if failures.is_empty():
-		print("PASS: all six pages scroll, positions persist, touch controls pass drags, and text fields follow Android keyboard focus.")
+		print("PASS: all pages scroll, positions persist, touch controls pass drags, fields follow keyboard focus, support is visible, and ordering challenges cannot deadlock.")
 		quit(0)
 		return
 	for failure in failures:

@@ -17,11 +17,77 @@ static func new_state() -> Dictionary:
 		"wins": 0,
 		"losses": 0,
 		"championships": 0,
+		"coach_trust": 0,
+		"school_awards": 0,
+		"scholarship": {},
+		"contract": {},
+		"injury": {},
+		"injury_history": [],
+		"games_missed": 0,
+		"tryout_year": -1,
+		"tryout_sport_id": "",
 		"last_training_year": -1,
 		"last_season_year": -1,
 		"draft_result": "",
 		"retired": false
 	}
+
+
+static func migrate_state(current: Dictionary) -> Dictionary:
+	var migrated := new_state()
+	for key in current:
+		var value = current[key]
+		migrated[key] = value.duplicate(true) if value is Array or value is Dictionary else value
+	return migrated
+
+
+static func create_tryout_session(current: Dictionary, sport_id: String, age: int, year: int, _stats: Dictionary, seed_value: int) -> Dictionary:
+	if not str(current.get("sport_id", "")).is_empty() and not bool(current.get("retired", false)):
+		return {"ok": false, "message": "You are already committed to a sport."}
+	if int(current.get("tryout_year", -1)) == year:
+		return {"ok": false, "message": "You already attended a sports tryout this year."}
+	var sport := find_sport(sport_id)
+	if sport.is_empty():
+		return {"ok": false, "message": "Sport not found."}
+	if age < int(sport.get("start_age", 6)):
+		return {"ok": false, "message": "This program opens at age %d." % int(sport.get("start_age", 6))}
+	if age > 17:
+		return {"ok": false, "message": "School-to-pro tryouts must begin during the youth or school years."}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var positions: Array = sport.get("positions", ["Competitor"])
+	var position := str(positions[rng.randi_range(0, positions.size() - 1)])
+	var phases := ["PHYSICAL SCREEN", "SKILL EVALUATION", "SCRIMMAGE IQ"]
+	var rounds: Array = []
+	for round_index in range(3):
+		var drill := sports_round(rng, str(sport.get("category", "team")), str(sport.get("name", "Sport")), position, round_index)
+		drill["prompt"] = "%s • %s" % [str(phases[round_index]), str(drill.get("prompt", "Read the situation."))]
+		drill["format"] = "choice"
+		rounds.append(drill)
+	return {"ok": true, "kind": "sports_tryout", "sport_id": sport_id, "title": "%s TRYOUT" % str(sport.get("name", "Sport")).to_upper(), "subtitle": "Three evaluations • projected %s" % position, "rounds": rounds, "round_index": 0, "score": 0}
+
+
+static func complete_tryout(current: Dictionary, sport_id: String, score: int, total: int, age: int, year: int, stats: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	if int(current.get("tryout_year", -1)) == year:
+		return {"ok": false, "message": "You already attended a sports tryout this year.", "state": current}
+	var attempted := migrate_state(current)
+	attempted["tryout_year"] = year
+	attempted["tryout_sport_id"] = sport_id
+	var rating := int(round(float(score) / float(maxi(1, total)) * 100.0))
+	if score <= 0:
+		return {"ok": false, "message": "%d%% at the tryout was not enough for a roster place. Train your life stats and return next year." % rating, "state": attempted}
+	var joined := join_sport(attempted, sport_id, age, year, stats, rng)
+	if not bool(joined.get("ok", false)):
+		joined["state"] = attempted
+		return joined
+	var state: Dictionary = joined.get("state", {}).duplicate(true)
+	state["tryout_year"] = year
+	state["tryout_sport_id"] = sport_id
+	state["skill"] = int(state.get("skill", 20)) + score * 2
+	state["game_iq"] = int(state.get("game_iq", 20)) + score
+	state["coach_trust"] = int(state.get("coach_trust", 20)) + score * 2
+	clamp_state(state)
+	return {"ok": true, "message": "%d%% tryout performance earned you a development roster place as a %s." % [rating, str(state.get("position", "competitor"))], "state": state}
 
 
 static func join_sport(current: Dictionary, sport_id: String, age: int, year: int, stats: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
@@ -48,6 +114,7 @@ static func join_sport(current: Dictionary, sport_id: String, age: int, year: in
 	state["fitness"] = clampi(int(float(health) * 0.72) + rng.randi_range(-4, 6), 15, 90)
 	state["game_iq"] = clampi(14 + int(float(discipline) / 3.0) + rng.randi_range(-3, 6), 12, 60)
 	state["reputation"] = clampi(int(float(confidence) / 4.0) + rng.randi_range(0, 8), 8, 45)
+	state["coach_trust"] = clampi(18 + int(float(discipline + confidence) / 8.0), 18, 48)
 	state["last_training_year"] = year - 1
 	state["last_season_year"] = year - 1
 	return {"ok": true, "message": "You earned a development place in %s as a %s." % [state["sport_name"], state["position"]], "state": state}
@@ -58,6 +125,8 @@ static func training_action(current: Dictionary, action: String, year: int, rng:
 		return {"ok": false, "message": "Join a sport first.", "state": current}
 	if int(current.get("last_training_year", -1)) == year:
 		return {"ok": false, "message": "You already completed focused training this year.", "state": current}
+	if not current.get("injury", {}).is_empty():
+		return {"ok": false, "message": "You must recover before returning to focused training.", "state": current}
 	var state := current.duplicate(true)
 	match action:
 		"physical":
@@ -76,8 +145,54 @@ static func training_action(current: Dictionary, action: String, year: int, rng:
 	return {"ok": true, "message": "Focused %s training improved your development profile." % action, "state": state}
 
 
+static func create_training_session(current: Dictionary, action: String, seed_value: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var sport := find_sport(str(current.get("sport_id", "")))
+	var sport_name := str(sport.get("name", current.get("sport_name", "Sport")))
+	var category := str(sport.get("category", "team"))
+	var position := str(current.get("position", "Competitor"))
+	var action_label := str({"physical": "Physical development", "technical": "Technical skill", "film": "Film and game IQ"}.get(action, "Athlete development"))
+	var rounds: Array = []
+	for round_index in range(3):
+		var drill := sports_round(rng, category, sport_name, position, round_index)
+		drill["prompt"] = "%s drill • %s" % [action_label, str(drill.get("prompt", "Read the situation."))]
+		drill["format"] = "choice"
+		rounds.append(drill)
+	return {"ok": true, "kind": "sports_training", "training_action": action, "title": "%s TRAINING" % sport_name.to_upper(), "subtitle": "%s • %s" % [action_label, position], "rounds": rounds, "round_index": 0, "score": 0}
+
+
+static func complete_training_session(current: Dictionary, action: String, score: int, total: int, year: int, rng: RandomNumberGenerator) -> Dictionary:
+	if str(current.get("sport_id", "")).is_empty() or bool(current.get("retired", false)):
+		return {"ok": false, "message": "Join a sport first.", "state": current}
+	if int(current.get("last_training_year", -1)) == year:
+		return {"ok": false, "message": "You already completed focused training this year.", "state": current}
+	if not current.get("injury", {}).is_empty():
+		return {"ok": false, "message": "You must recover before training.", "state": current}
+	var state := current.duplicate(true)
+	var rating := int(round(float(score) / float(maxi(1, total)) * 100.0))
+	var primary_gain := 3 + score * 2
+	var secondary_gain := 1 + score
+	match action:
+		"physical":
+			state["fitness"] = int(state.get("fitness", 30)) + primary_gain
+			state["skill"] = int(state.get("skill", 20)) + secondary_gain
+		"technical":
+			state["skill"] = int(state.get("skill", 20)) + primary_gain
+			state["game_iq"] = int(state.get("game_iq", 20)) + secondary_gain
+		"film":
+			state["game_iq"] = int(state.get("game_iq", 20)) + primary_gain
+			state["reputation"] = int(state.get("reputation", 20)) + secondary_gain
+		_:
+			return {"ok": false, "message": "Training option not found.", "state": current}
+	state["coach_trust"] = int(state.get("coach_trust", 20)) + 2 + score
+	state["last_training_year"] = year
+	clamp_state(state)
+	return {"ok": true, "message": "%d%% training performance added %d primary development points." % [rating, primary_gain], "state": state}
+
+
 static func can_play_season(state: Dictionary, year: int) -> bool:
-	return not str(state.get("sport_id", "")).is_empty() and not bool(state.get("retired", false)) and int(state.get("last_season_year", -1)) != year
+	return not str(state.get("sport_id", "")).is_empty() and not bool(state.get("retired", false)) and state.get("injury", {}).is_empty() and int(state.get("last_season_year", -1)) != year
 
 
 static func create_season_session(state: Dictionary, seed_value: int) -> Dictionary:
@@ -110,6 +225,7 @@ static func complete_season(current: Dictionary, score: int, total: int, age: in
 	state["skill"] = int(state.get("skill", 20)) + 2 + int(float(rating) / 18.0)
 	state["game_iq"] = int(state.get("game_iq", 20)) + 1 + int(float(rating) / 28.0)
 	state["reputation"] = int(state.get("reputation", 15)) + int(float(rating) / 14.0)
+	state["coach_trust"] = int(state.get("coach_trust", 20)) + int(float(rating) / 16.0) - 2
 	var wins := clampi(3 + int(float(rating) / 10.0) + rng.randi_range(-2, 3), 1, 15)
 	var losses := clampi(13 - wins + rng.randi_range(-1, 2), 0, 14)
 	state["wins"] = int(state.get("wins", 0)) + wins
@@ -118,12 +234,16 @@ static func complete_season(current: Dictionary, score: int, total: int, age: in
 	if championship:
 		state["championships"] = int(state.get("championships", 0)) + 1
 		state["reputation"] = int(state.get("reputation", 20)) + 8
+		state["school_awards"] = int(state.get("school_awards", 0)) + (1 if str(state.get("stage", "")) in ["youth", "school", "college"] else 0)
+	var injury_message := maybe_apply_injury(state, rating, rng)
 	clamp_state(state)
 	var transition := process_stage_transition(state, age, rng)
 	state = transition.get("state", state)
 	var message := "%d–%d season, %d%% performance." % [wins, losses, rating]
 	if championship:
 		message += " Your team won a championship."
+	if not injury_message.is_empty():
+		message += " " + injury_message
 	if not str(transition.get("message", "")).is_empty():
 		message += " " + str(transition.get("message", ""))
 	return {"ok": true, "message": message, "state": state, "job": transition.get("job", {})}
@@ -133,6 +253,15 @@ static func process_year(current: Dictionary, age: int, year: int, rng: RandomNu
 	if str(current.get("sport_id", "")).is_empty() or bool(current.get("retired", false)):
 		return {"state": current, "message": "", "job": {}}
 	var state := current.duplicate(true)
+	var recovery_message := ""
+	var injury: Dictionary = state.get("injury", {})
+	if not injury.is_empty():
+		injury["years_left"] = int(injury.get("years_left", 1)) - 1
+		if int(injury.get("years_left", 0)) <= 0:
+			recovery_message = "You completed rehabilitation and returned from %s." % str(injury.get("name", "injury"))
+			state["injury"] = {}
+		else:
+			state["injury"] = injury
 	if int(state.get("last_training_year", -1)) < year - 1:
 		state["fitness"] = int(state.get("fitness", 40)) - 2
 	if int(state.get("last_season_year", -1)) < year - 1:
@@ -143,10 +272,28 @@ static func process_year(current: Dictionary, age: int, year: int, rng: RandomNu
 		state["stage"] = "retired"
 		state["retired"] = true
 		return {"state": state, "message": "You retired from professional %s after %d seasons." % [state.get("sport_name", "sport"), state.get("seasons", 0)], "job": {}}
+	var renewed_job: Dictionary = {}
+	var contract: Dictionary = state.get("contract", {})
+	if str(state.get("stage", "")) == "pro" and not contract.is_empty():
+		contract["years_left"] = int(contract.get("years_left", 1)) - 1
+		if int(contract.get("years_left", 0)) <= 0:
+			var renewal_years := rng.randi_range(2, 5)
+			var salary_multiplier := 1.04 + float(athlete_rating(state)) / 500.0
+			contract["annual_salary"] = int(round(float(contract.get("annual_salary", 65000)) * salary_multiplier))
+			contract["years_left"] = renewal_years
+			contract["total_value"] = int(contract["annual_salary"]) * renewal_years
+			renewed_job = pro_job(state)
+			renewed_job["salary"] = int(contract["annual_salary"])
+			recovery_message = (recovery_message + " " if not recovery_message.is_empty() else "") + "You signed a %d-year contract extension worth %s." % [renewal_years, money_text(int(contract["total_value"]))]
+		state["contract"] = contract
 	var transition := process_stage_transition(state, age, rng)
 	var transitioned_state: Dictionary = transition.get("state", state)
 	clamp_state(transitioned_state)
 	transition["state"] = transitioned_state
+	if not renewed_job.is_empty():
+		transition["job"] = renewed_job
+	if not recovery_message.is_empty():
+		transition["message"] = (str(transition.get("message", "")) + " " + recovery_message).strip_edges()
 	return transition
 
 
@@ -163,7 +310,9 @@ static func process_stage_transition(current: Dictionary, age: int, rng: RandomN
 		if rating >= 52:
 			state["stage"] = "college"
 			state["team"] = generate_team_name(rng, str(state.get("sport_name", "Sport")), false)
-			message = "A college or elite development program offered you a roster place."
+			var scholarship_percent := clampi((rating - 42) * 4 + rng.randi_range(-10, 15), 25, 100)
+			state["scholarship"] = {"percent": scholarship_percent, "annual_value": scholarship_percent * 180, "school": state["team"]}
+			message = "A college or elite development program offered you a roster place with a %d%% athletic scholarship." % scholarship_percent
 		else:
 			state["stage"] = "amateur"
 			message = "No major scholarship arrived, so you continued at the amateur level."
@@ -173,7 +322,9 @@ static func process_stage_transition(current: Dictionary, age: int, rng: RandomN
 			state["team"] = generate_team_name(rng, str(state.get("sport_name", "Sport")), true)
 			state["draft_result"] = "Selected for a professional roster at age %d" % age
 			job = pro_job(state)
-			message = "You earned a professional contract with %s." % state["team"]
+			var contract_years := rng.randi_range(2, 4)
+			state["contract"] = {"years_left": contract_years, "annual_salary": int(job.get("salary", 0)), "total_value": int(job.get("salary", 0)) * contract_years}
+			message = "You earned a %d-year professional contract with %s worth %s." % [contract_years, state["team"], money_text(int(state["contract"]["total_value"]))]
 		elif rating >= 56:
 			state["stage"] = "developmental"
 			message = "You entered a semi-professional development league and kept the dream alive."
@@ -184,8 +335,42 @@ static func process_stage_transition(current: Dictionary, age: int, rng: RandomN
 		state["team"] = generate_team_name(rng, str(state.get("sport_name", "Sport")), true)
 		state["draft_result"] = "Signed from a developmental league at age %d" % age
 		job = pro_job(state)
-		message = "A professional organization signed you after your developmental breakthrough."
+		var development_contract_years := rng.randi_range(1, 3)
+		state["contract"] = {"years_left": development_contract_years, "annual_salary": int(job.get("salary", 0)), "total_value": int(job.get("salary", 0)) * development_contract_years}
+		message = "A professional organization signed you after your developmental breakthrough for %s." % money_text(int(state["contract"]["total_value"]))
 	return {"state": state, "message": message, "job": job}
+
+
+static func maybe_apply_injury(state: Dictionary, performance_rating: int, rng: RandomNumberGenerator) -> String:
+	if not state.get("injury", {}).is_empty():
+		return ""
+	var fitness := int(state.get("fitness", 50))
+	var injury_chance := clampi(9 - int(float(fitness) / 16.0) + (4 if performance_rating < 35 else 0), 2, 11)
+	if rng.randi_range(1, 100) > injury_chance:
+		return ""
+	var injuries := [
+		{"name": "ankle sprain", "years_left": 1, "games": 5},
+		{"name": "shoulder strain", "years_left": 1, "games": 6},
+		{"name": "concussion recovery", "years_left": 1, "games": 8},
+		{"name": "knee ligament injury", "years_left": 2, "games": 18},
+		{"name": "stress fracture", "years_left": 1, "games": 10}
+	]
+	var injury: Dictionary = injuries[rng.randi_range(0, injuries.size() - 1)].duplicate(true)
+	state["injury"] = injury
+	state["games_missed"] = int(state.get("games_missed", 0)) + int(injury.get("games", 0))
+	var history: Array = state.get("injury_history", [])
+	history.push_front(injury.duplicate(true))
+	state["injury_history"] = history
+	return "You suffered a %s and are expected to miss about %d games." % [injury.get("name", "sports injury"), injury.get("games", 0)]
+
+
+static func money_text(value: int) -> String:
+	var digits := str(absi(value))
+	var formatted := ""
+	while digits.length() > 3:
+		formatted = "," + digits.right(3) + formatted
+		digits = digits.left(digits.length() - 3)
+	return "$" + digits + formatted
 
 
 static func pro_job(state: Dictionary) -> Dictionary:
@@ -219,7 +404,7 @@ static func stage_label(stage: String) -> String:
 
 
 static func clamp_state(state: Dictionary) -> void:
-	for key in ["skill", "fitness", "game_iq", "reputation"]:
+	for key in ["skill", "fitness", "game_iq", "reputation", "coach_trust"]:
 		state[key] = clampi(int(state.get(key, 0)), 0, 100)
 
 

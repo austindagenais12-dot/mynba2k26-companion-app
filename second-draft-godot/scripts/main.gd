@@ -16,6 +16,7 @@ const CAREERS_PER_PAGE := 14
 const KEYBOARD_FALLBACK_PADDING := 430
 const INPUT_REVEAL_MARGIN := 28
 const NORMAL_SCROLL_PADDING := 24
+const APP_VERSION := "0.5.0"
 
 var simulation: LifeSimulation
 var current_page := "life"
@@ -286,6 +287,7 @@ func build_origin_card() -> Control:
 	box.add_child(make_key_value("HOUSEHOLD", str(background.get("household", "A unique household")), TEXT))
 	box.add_child(make_key_value("CHILDHOOD", str(background.get("childhood_trait", "Curious")), BLUE))
 	box.add_child(make_key_value("TRADITION", str(background.get("family_tradition", "Family time")), GOLD))
+	box.add_child(make_key_value("MEMORIES", str(simulation.data.get("life_memories", []).size()), BLUE))
 	box.add_child(make_key_value("LIFE SEED", str(absi(int(simulation.data.get("life_seed", 0)))), MUTED))
 	return panel
 
@@ -682,7 +684,7 @@ func build_sports_page() -> void:
 		var training_button := make_button(str(training[0]), "secondary", 11)
 		training_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		training_button.custom_minimum_size.y = 55
-		training_button.disabled = int(sports.get("last_training_year", -1)) == int(simulation.data.get("year", 2026)) or bool(sports.get("retired", false))
+		training_button.disabled = int(sports.get("last_training_year", -1)) == int(simulation.data.get("year", 2026)) or bool(sports.get("retired", false)) or not sports.get("injury", {}).is_empty()
 		training_button.pressed.connect(on_sports_training.bind(str(training[1])))
 		training_row.add_child(training_button)
 	var season_button := make_button("PLAY THIS SEASON", "primary", 17)
@@ -703,7 +705,7 @@ func build_sports_pathway_intro() -> Control:
 	box.add_theme_constant_override("separation", 8)
 	margin.add_child(box)
 	box.add_child(make_label("ONE SPORT. ONE LONG ROAD.", 18, TEXT, 800))
-	var body := make_label("Join before age 18, train once per year, and play a three-decision season. Skill, fitness, game IQ, reputation, wins, championships, and scouting transitions all persist in your life save.", 13, MUTED, 500)
+	var body := make_label("Attend one school or youth tryout per year before age 18. Once selected, complete position-aware training and season decisions. Ratings, coach trust, injuries, awards, scholarships, contracts, and results all persist in your life save.", 13, MUTED, 500)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(body)
 	box.add_child(make_key_value("CURRENT AGE", str(simulation.data.get("age", 0)), GOLD))
@@ -735,10 +737,11 @@ func build_sport_catalog_card(sport: Dictionary) -> Control:
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	details.add_child(subtitle)
 	details.add_child(make_label("Youth → school → college/development → professional", 11, TEAL, 700))
-	var join_button := make_button("JOIN", "secondary", 12)
+	var tried_this_year := int(simulation.data.get("sports", {}).get("tryout_year", -1)) == int(simulation.data.get("year", 2026))
+	var join_button := make_button("TRIED" if tried_this_year else "TRY OUT", "secondary", 12)
 	join_button.custom_minimum_size = Vector2(102, 54)
 	var age := int(simulation.data.get("age", 0))
-	join_button.disabled = age < int(sport.get("start_age", 6)) or age > 17
+	join_button.disabled = age < int(sport.get("start_age", 6)) or age > 17 or tried_this_year
 	join_button.pressed.connect(on_sport_join.bind(str(sport.get("id", ""))))
 	row.add_child(join_button)
 	return panel
@@ -759,8 +762,20 @@ func build_active_sports_card(sports: Dictionary) -> Control:
 	box.add_child(make_key_value("ATHLETE RATING", "%d OVR" % SportsSystem.athlete_rating(sports), GOLD))
 	box.add_child(make_key_value("SKILL / FITNESS", "%d / %d" % [int(sports.get("skill", 0)), int(sports.get("fitness", 0))], TEXT))
 	box.add_child(make_key_value("GAME IQ / REP", "%d / %d" % [int(sports.get("game_iq", 0)), int(sports.get("reputation", 0))], TEXT))
+	box.add_child(make_key_value("COACH TRUST", "%d" % int(sports.get("coach_trust", 0)), BLUE))
+	box.add_child(make_key_value("SCHOOL AWARDS", str(sports.get("school_awards", 0)), GOLD))
 	box.add_child(make_key_value("CAREER RECORD", "%d–%d" % [int(sports.get("wins", 0)), int(sports.get("losses", 0))], TEAL))
 	box.add_child(make_key_value("SEASONS / TITLES", "%d / %d" % [int(sports.get("seasons", 0)), int(sports.get("championships", 0))], GOLD))
+	box.add_child(make_key_value("GAMES MISSED", str(sports.get("games_missed", 0)), ROSE))
+	var injury: Dictionary = sports.get("injury", {})
+	if not injury.is_empty():
+		box.add_child(make_key_value("INJURY", "%s • %d year(s)" % [str(injury.get("name", "Injury")).capitalize(), int(injury.get("years_left", 1))], ROSE))
+	var scholarship: Dictionary = sports.get("scholarship", {})
+	if not scholarship.is_empty():
+		box.add_child(make_key_value("SCHOLARSHIP", "%d%% • %s/year" % [int(scholarship.get("percent", 0)), simulation.format_money(int(scholarship.get("annual_value", 0)))], GOLD))
+	var contract: Dictionary = sports.get("contract", {})
+	if not contract.is_empty():
+		box.add_child(make_key_value("CONTRACT", "%d year(s) • %s total" % [int(contract.get("years_left", 0)), simulation.format_money(int(contract.get("total_value", 0)))], GOLD))
 	var draft_result := str(sports.get("draft_result", ""))
 	if not draft_result.is_empty():
 		var draft_label := make_label(draft_result, 12, GOLD, 700)
@@ -808,6 +823,39 @@ func build_assets_page() -> void:
 	content.add_child(make_section_label("MARKETPLACE"))
 	for asset in EventCatalog.assets():
 		content.add_child(build_asset_card(asset))
+	content.add_child(make_section_label("SUPPORT & INSTALLATION"))
+	content.add_child(build_support_card())
+
+
+func build_support_card() -> Control:
+	var panel := make_panel(SURFACE_RAISED, 22, 1, Color("426873"))
+	var margin := MarginContainer.new()
+	set_margins(margin, 18, 16, 18, 16)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 9)
+	margin.add_child(box)
+	box.add_child(make_label("BUILD & DEVICE HELP", 15, TEAL, 800))
+	box.add_child(make_key_value("VERSION", APP_VERSION, GOLD))
+	box.add_child(make_key_value("SAVE SCHEMA", str(LifeSimulation.SAVE_VERSION), BLUE))
+	box.add_child(make_key_value("PACKAGE", "com.lakeshoreinteractive.seconddraft", TEXT))
+	var install_help := make_label("If Android reports ‘App not installed’ while upgrading this test build, uninstall the previous Second Draft first, then open the APK and allow Install unknown apps for the app you opened it from. Uninstalling removes the device-local life save.", 12, MUTED, 500)
+	install_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(install_help)
+	var copy_button := make_button("COPY DIAGNOSTICS", "secondary", 13)
+	copy_button.custom_minimum_size.y = 54
+	copy_button.pressed.connect(copy_diagnostics)
+	box.add_child(copy_button)
+	return panel
+
+
+func diagnostics_text() -> String:
+	return "Second Draft %s\nPackage: com.lakeshoreinteractive.seconddraft\nSave schema: %d\nPlatform: %s\nLife seed: %s\nYear: %d\nAge: %d" % [APP_VERSION, LifeSimulation.SAVE_VERSION, OS.get_name(), str(absi(int(simulation.data.get("life_seed", 0)))), int(simulation.data.get("year", 2026)), int(simulation.data.get("age", 0))]
+
+
+func copy_diagnostics() -> void:
+	DisplayServer.clipboard_set(diagnostics_text())
+	show_toast("Diagnostics copied to the clipboard.", true)
 
 
 func build_finance_card() -> Control:
@@ -890,15 +938,19 @@ func on_work_shift() -> void:
 
 
 func on_sport_join(sport_id: String) -> void:
-	var result := simulation.join_sport(sport_id)
-	show_toast(str(result.get("message", "")), bool(result.get("ok", false)))
-	show_page("sports")
+	var session := simulation.create_sports_tryout_session(sport_id)
+	if not bool(session.get("ok", false)):
+		show_toast(str(session.get("message", "A tryout is not available.")))
+		return
+	start_minigame(session)
 
 
 func on_sports_training(action: String) -> void:
-	var result := simulation.sports_train(action)
-	show_toast(str(result.get("message", "")), bool(result.get("ok", false)))
-	show_page("sports")
+	var session := simulation.create_sports_training_session(action)
+	if not bool(session.get("ok", false)):
+		show_toast(str(session.get("message", "Training is not available.")))
+		return
+	start_minigame(session)
 
 
 func on_sports_season() -> void:
@@ -955,12 +1007,29 @@ func show_minigame_round() -> void:
 	prompt.add_theme_constant_override("line_spacing", 5)
 	box.add_child(prompt)
 	var options: Array = round_data.get("options", [])
-	for option_index in range(options.size()):
-		var answer := make_button(str(options[option_index]), "choice", 15)
-		answer.custom_minimum_size.y = 72
-		answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		answer.pressed.connect(answer_minigame.bind(option_index))
-		box.add_child(answer)
+	var round_format := str(round_data.get("format", "choice"))
+	if round_format == "sequence":
+		var selected: Array = round_data.get("selected", [])
+		box.add_child(make_label("ORDER BUILT: %d / %d" % [selected.size(), options.size()], 12, BLUE, 800))
+		for selected_step in selected:
+			var selected_label := make_label("✓ %s" % str(selected_step), 12, TEAL, 600)
+			selected_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(selected_label)
+		for option in options:
+			if selected.has(option):
+				continue
+			var sequence_answer := make_button(str(option), "choice", 15)
+			sequence_answer.custom_minimum_size.y = 72
+			sequence_answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			sequence_answer.pressed.connect(answer_sequence_minigame.bind(str(option)))
+			box.add_child(sequence_answer)
+	else:
+		for option_index in range(options.size()):
+			var answer := make_button(str(options[option_index]), "choice", 15)
+			answer.custom_minimum_size.y = 72
+			answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			answer.pressed.connect(answer_minigame.bind(option_index))
+			box.add_child(answer)
 	box.add_child(make_label("Choose the safest, most realistic professional decision.", 11, MUTED, 500))
 
 
@@ -976,6 +1045,32 @@ func answer_minigame(option_index: int) -> void:
 	show_minigame_round()
 
 
+func answer_sequence_minigame(option_text: String) -> void:
+	var rounds: Array = active_minigame.get("rounds", [])
+	var round_index := int(active_minigame.get("round_index", 0))
+	if round_index < 0 or round_index >= rounds.size():
+		return
+	var round_data: Dictionary = rounds[round_index]
+	var selected: Array = round_data.get("selected", [])
+	if selected.has(option_text):
+		return
+	selected.append(option_text)
+	round_data["selected"] = selected
+	rounds[round_index] = round_data
+	active_minigame["rounds"] = rounds
+	var correct_order: Array = round_data.get("correct_order", [])
+	if selected.size() >= correct_order.size():
+		var is_correct := selected.size() == correct_order.size()
+		for index in range(correct_order.size()):
+			if str(selected[index]) != str(correct_order[index]):
+				is_correct = false
+				break
+		if is_correct:
+			active_minigame["score"] = int(active_minigame.get("score", 0)) + 1
+		active_minigame["round_index"] = round_index + 1
+	show_minigame_round()
+
+
 func finish_minigame() -> void:
 	var kind := str(active_minigame.get("kind", "work"))
 	var score := int(active_minigame.get("score", 0))
@@ -984,11 +1079,15 @@ func finish_minigame() -> void:
 	var result: Dictionary
 	if kind == "sports":
 		result = simulation.complete_sports_session(score, total)
+	elif kind == "sports_tryout":
+		result = simulation.complete_sports_tryout_session(str(active_minigame.get("sport_id", "")), score, total)
+	elif kind == "sports_training":
+		result = simulation.complete_sports_training_session(str(active_minigame.get("training_action", "technical")), score, total)
 	else:
 		result = simulation.complete_work_session(score, total)
 	active_minigame = {}
 	close_overlay()
-	show_page("sports" if kind == "sports" else "work")
+	show_page("sports" if kind in ["sports", "sports_tryout", "sports_training"] else "work")
 	show_toast(str(result.get("message", "Minigame complete.")), bool(result.get("ok", false)))
 
 

@@ -2,7 +2,7 @@ extends RefCounted
 class_name LifeSimulation
 
 const SAVE_PATH := "user://second_draft_save.json"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 const STAT_KEYS := ["health", "happiness", "smarts", "confidence", "discipline", "reputation"]
 const RELATIONSHIP_KEYS := ["family", "friends"]
 
@@ -61,6 +61,7 @@ func new_life(first_name: String = "", last_name: String = "") -> void:
 		"activities_used": [],
 		"sports": SportsSystem.new_state(),
 		"dynamic_event_count": 0,
+		"life_memories": [],
 		"work_shift_year": -1,
 		"flags": {},
 		"history": identity.get("history", []).duplicate(true)
@@ -121,6 +122,7 @@ func resolve_choice(choice_index: int) -> String:
 	_apply_effects(effects)
 	var result := str(choice.get("result", "Your choice changed the course of the year."))
 	_add_history(str(pending_event.get("title", "A turning point")), result, _tone_for_effects(effects))
+	_record_event_memory(pending_event, choice, result, effects)
 	pending_event = {}
 	_clamp_all_values()
 	save_game()
@@ -219,6 +221,27 @@ func join_sport(sport_id: String) -> Dictionary:
 	return result
 
 
+func create_sports_tryout_session(sport_id: String) -> Dictionary:
+	if not bool(data.get("alive", false)):
+		return {"ok": false, "message": "This life has ended."}
+	return SportsSystem.create_tryout_session(data.get("sports", {}), sport_id, int(data.get("age", 0)), int(data.get("year", 2026)), data.get("stats", {}), int(rng.randi()))
+
+
+func complete_sports_tryout_session(sport_id: String, score: int, total: int) -> Dictionary:
+	var result := SportsSystem.complete_tryout(data.get("sports", {}), sport_id, score, total, int(data.get("age", 0)), int(data.get("year", 2026)), data.get("stats", {}), rng)
+	data["sports"] = result.get("state", data.get("sports", {})).duplicate(true)
+	if bool(result.get("ok", false)):
+		data["stats"]["confidence"] = int(data["stats"].get("confidence", 50)) + score + 1
+		data["stats"]["discipline"] = int(data["stats"].get("discipline", 50)) + score
+		_add_history("Made the %s pathway" % str(data["sports"].get("sport_name", "sports")), str(result.get("message", "The tryout opened a new pathway.")), "blue")
+	else:
+		data["stats"]["confidence"] = int(data["stats"].get("confidence", 50)) - 1
+		_add_history("Sports tryout", str(result.get("message", "The roster was out of reach this year.")), "neutral")
+	_clamp_all_values()
+	save_game()
+	return result
+
+
 func sports_train(action: String) -> Dictionary:
 	var result := SportsSystem.training_action(data.get("sports", {}), action, int(data.get("year", 2026)), rng)
 	if bool(result.get("ok", false)):
@@ -231,10 +254,37 @@ func sports_train(action: String) -> Dictionary:
 	return result
 
 
+func create_sports_training_session(action: String) -> Dictionary:
+	var sports: Dictionary = data.get("sports", {})
+	if str(sports.get("sport_id", "")).is_empty():
+		return {"ok": false, "message": "Join a sport before training."}
+	if int(sports.get("last_training_year", -1)) == int(data.get("year", 2026)):
+		return {"ok": false, "message": "You already completed focused training this year."}
+	if not sports.get("injury", {}).is_empty():
+		return {"ok": false, "message": "Recover from your injury before training."}
+	return SportsSystem.create_training_session(sports, action, int(rng.randi()))
+
+
+func complete_sports_training_session(action: String, score: int, total: int) -> Dictionary:
+	var result := SportsSystem.complete_training_session(data.get("sports", {}), action, score, total, int(data.get("year", 2026)), rng)
+	if not bool(result.get("ok", false)):
+		return result
+	data["sports"] = result.get("state", {}).duplicate(true)
+	data["stats"]["health"] = int(data["stats"].get("health", 50)) + (2 if action == "physical" else 1)
+	data["stats"]["discipline"] = int(data["stats"].get("discipline", 50)) + 2 + score
+	data["stats"]["confidence"] = int(data["stats"].get("confidence", 50)) + score
+	_clamp_all_values()
+	_add_history("%s training" % str(data["sports"].get("sport_name", "Athlete")), str(result.get("message", "Training complete.")), "teal")
+	save_game()
+	return result
+
+
 func create_sports_session() -> Dictionary:
 	var sports: Dictionary = data.get("sports", {})
 	if str(sports.get("sport_id", "")).is_empty():
 		return {"ok": false, "message": "Join a sport before playing a season."}
+	if not sports.get("injury", {}).is_empty():
+		return {"ok": false, "message": "You cannot play this season while recovering from %s." % str(sports.get("injury", {}).get("name", "an injury"))}
 	if not SportsSystem.can_play_season(sports, int(data.get("year", 2026))):
 		return {"ok": false, "message": "You already completed this season."}
 	var session := SportsSystem.create_season_session(sports, int(rng.randi()))
@@ -459,8 +509,12 @@ func _migrate_loaded_data() -> void:
 		data["education_program"] = {}
 	if not data.has("sports"):
 		data["sports"] = SportsSystem.new_state()
+	else:
+		data["sports"] = SportsSystem.migrate_state(data.get("sports", {}))
 	if not data.has("dynamic_event_count"):
 		data["dynamic_event_count"] = 0
+	if not data.has("life_memories"):
+		data["life_memories"] = []
 	if not data.has("work_shift_year"):
 		data["work_shift_year"] = -1
 	if not data.has("history"):
@@ -508,7 +562,11 @@ func _process_active_education_program() -> void:
 	var program: Dictionary = data.get("education_program", {})
 	if program.is_empty():
 		return
-	data["balance"] = int(data.get("balance", 0)) - int(program.get("annual_cost", 0))
+	var tuition := int(program.get("annual_cost", 0))
+	var scholarship: Dictionary = data.get("sports", {}).get("scholarship", {})
+	if not scholarship.is_empty() and str(data.get("sports", {}).get("stage", "")) == "college":
+		tuition = maxi(0, tuition - int(scholarship.get("annual_value", 0)))
+	data["balance"] = int(data.get("balance", 0)) - tuition
 	data["stats"]["smarts"] = clampi(int(data["stats"].get("smarts", 50)) + 4, 0, 100)
 	data["stats"]["discipline"] = clampi(int(data["stats"].get("discipline", 50)) + 2, 0, 100)
 	program["years_left"] = int(program.get("years_left", 1)) - 1
@@ -542,6 +600,8 @@ func _process_sports() -> void:
 			if bool(current_job.get("sports_job", false)):
 				data["job"] = {}
 				data["job_progress"] = 0
+		if not data["sports"].get("scholarship", {}).is_empty() and str(data["sports"].get("stage", "")) == "college":
+			data["education_label"] = "College athlete — %d%% scholarship" % int(data["sports"].get("scholarship", {}).get("percent", 0))
 		_add_history("Athletic pathway", message, "gold")
 
 
@@ -856,6 +916,23 @@ func _add_history(title: String, body: String, tone: String) -> void:
 	if history.size() > 160:
 		history.resize(160)
 	data["history"] = history
+
+
+func _record_event_memory(source_event: Dictionary, choice: Dictionary, result: String, effects: Dictionary) -> void:
+	var memories: Array = data.get("life_memories", [])
+	memories.push_front({
+		"id": str(source_event.get("id", "memory_%d_%d" % [int(data.get("age", 0)), memories.size()])),
+		"category": str(source_event.get("category", "milestone" if not bool(source_event.get("generated", false)) else "life")),
+		"title": str(source_event.get("title", "A past decision")),
+		"choice": str(choice.get("text", "A choice")),
+		"result": result,
+		"effects": effects.duplicate(true),
+		"age": int(data.get("age", 0)),
+		"year": int(data.get("year", 2026))
+	})
+	if memories.size() > 80:
+		memories.resize(80)
+	data["life_memories"] = memories
 
 
 func _tone_for_effects(effects: Dictionary) -> String:

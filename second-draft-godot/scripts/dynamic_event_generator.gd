@@ -3,12 +3,14 @@ class_name DynamicEventGenerator
 
 
 static func generate(state: Dictionary, rng: RandomNumberGenerator, sequence: int) -> Dictionary:
-	var categories := eligible_categories(state)
+	var categories: Array = eligible_categories(state)
 	if categories.is_empty():
 		return {}
-	var category := str(categories[rng.randi_range(0, categories.size() - 1)])
+	var memories: Array = state.get("life_memories", [])
+	var category := "follow_up" if not memories.is_empty() and rng.randf() < 0.24 else str(categories[rng.randi_range(0, categories.size() - 1)])
 	var event: Dictionary
 	match category:
+		"follow_up": event = follow_up_event(state, rng)
 		"childhood": event = childhood_event(state, rng)
 		"school": event = school_event(state, rng)
 		"friendship": event = friendship_event(state, rng)
@@ -26,6 +28,29 @@ static func generate(state: Dictionary, rng: RandomNumberGenerator, sequence: in
 	event["generated"] = true
 	event["category"] = category
 	return event
+
+
+static func follow_up_event(state: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	var memories: Array = state.get("life_memories", [])
+	if memories.is_empty():
+		return ordinary_event(state, rng)
+	var recent_count := mini(10, memories.size())
+	var memory: Dictionary = memories[rng.randi_range(0, recent_count - 1)]
+	var old_title := str(memory.get("title", "an earlier decision"))
+	var old_result := str(memory.get("result", "Your earlier choice changed something."))
+	var elapsed_years := maxi(1, int(state.get("age", 0)) - int(memory.get("age", 0)))
+	var return_reason := pick(rng, ["someone remembers what you did", "the unfinished part of the situation returns", "a new opportunity grows from that decision", "the consequences become visible", "someone asks you to stand behind that choice", "circumstances have changed enough to reopen it"])
+	var generated := event(
+		pick(rng, ["An Old Choice Returns", "The Next Chapter", "Consequences", "Remember When?", "A Thread Reappears"]),
+		"%d year%s after ‘%s,’ %s. You remember: %s" % [elapsed_years, "" if elapsed_years == 1 else "s", old_title, return_reason, old_result],
+		[
+			choice("Build on what happened", "You treat the past as a foundation and create something better from it.", {"confidence": 5, "discipline": 4, "reputation": 4}),
+			choice("Make amends or correct course", "Facing the old decision honestly repairs more than expected.", {"family": 4, "friends": 4, "reputation": 5, "happiness": 2}),
+			choice("Leave the past alone", "You protect the present, though the old story remains unresolved.", {"health": 2, "happiness": -2, "confidence": -1})
+		]
+	)
+	generated["chain_from"] = str(memory.get("id", ""))
+	return generated
 
 
 static func eligible_categories(state: Dictionary) -> Array:

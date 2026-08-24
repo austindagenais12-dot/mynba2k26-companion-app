@@ -10,7 +10,10 @@ static func create_session(job: Dictionary, seed_value: int) -> Dictionary:
 	var archetype := archetype_for(job)
 	var rounds: Array = []
 	for round_index in range(3):
-		rounds.append(build_round(job, archetype, round_index, rng))
+		if round_index == 1:
+			rounds.append(build_sequence_round(job, archetype, rng))
+		else:
+			rounds.append(build_round(job, archetype, round_index, rng))
 	return {
 		"ok": true,
 		"kind": "work",
@@ -110,8 +113,35 @@ static func build_round(job: Dictionary, archetype: String, round_index: int, rn
 	shuffle_with_rng(options, rng)
 	return {
 		"prompt": "ROUND %d • %s" % [round_index + 1, str(scenario.get("prompt", "A work decision needs your attention."))],
+		"format": "choice",
 		"options": options,
 		"correct_index": options.find(correct)
+	}
+
+
+static func build_sequence_round(job: Dictionary, archetype: String, rng: RandomNumberGenerator) -> Dictionary:
+	var role := str(job.get("base_title", job.get("title", "professional")))
+	var workplace := str(job.get("workplace", "the workplace"))
+	var correct_order: Array
+	match archetype:
+		"clinical", "care", "childcare", "personal_care", "response", "support":
+			correct_order = ["Protect immediate safety and stabilize the situation", "Assess and verify the key facts with the right people", "Document the outcome and communicate the follow-up plan"]
+		"technical", "security", "research", "analysis":
+			correct_order = ["Capture reliable evidence and reproduce or confirm the issue", "Isolate the cause, exposure, or decision variable", "Apply a controlled response and verify the result"]
+		"engineering", "hands_on", "logistics", "fieldwork", "culinary", "performance":
+			correct_order = ["Stop and identify hazards, limits, and the required outcome", "Verify the plan, tools, materials, and measurements", "Execute carefully, inspect the result, and record completion"]
+		"creative", "communications", "teaching", "service":
+			correct_order = ["Clarify the audience, need, and definition of success", "Create or act within the agreed constraints", "Review the response, gather feedback, and adapt"]
+		_:
+			correct_order = ["Confirm the facts, authority, impact, and deadline", "Prioritize the work and assign a clear owner", "Communicate the plan, monitor progress, and close the loop"]
+	var options: Array = correct_order.duplicate()
+	shuffle_with_rng(options, rng)
+	return {
+		"prompt": "ROUND 2 • As the %s at %s, put the response in the safest professional order." % [role, workplace],
+		"format": "sequence",
+		"options": options,
+		"correct_order": correct_order,
+		"selected": []
 	}
 
 
