@@ -64,6 +64,7 @@ static func milestone_for_age(age: int, state: Dictionary) -> Dictionary:
 					_choice("Keep working", "Purpose matters more to you than the calendar.", {"discipline": 6, "happiness": -2, "reputation": 5}),
 					_choice("Work part-time", "You choose a balance of purpose and freedom.", {"part_time": true, "happiness": 6, "health": 2})
 				]
+			)
 	return {}
 
 
@@ -522,4 +523,3 @@ static func _event(id_value: String, title: String, body: String, choices: Array
 
 static func _choice(text: String, result: String, effects: Dictionary) -> Dictionary:
 	return {"text": text, "result": result, "effects": effects}
-
