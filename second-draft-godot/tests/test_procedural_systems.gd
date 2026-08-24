@@ -46,7 +46,7 @@ func test_seeded_lives(failures: Array[String]) -> void:
 func test_dynamic_events(failures: Array[String]) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 44332211
-	var state := LifeGenerator.generate_identity(rng)
+	var state: Dictionary = LifeGenerator.generate_identity(rng)
 	state["age"] = 28
 	state["year"] = 2054
 	state["balance"] = 18000

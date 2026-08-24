@@ -3,7 +3,7 @@ class_name LifeGenerator
 
 
 static func generate_identity(rng: RandomNumberGenerator, first_override: String = "", last_override: String = "") -> Dictionary:
-	var sets := name_sets()
+	var sets: Array = name_sets()
 	var selected_set: Dictionary = sets[rng.randi_range(0, sets.size() - 1)]
 	var first_name := first_override.strip_edges()
 	var last_name := last_override.strip_edges()
@@ -20,11 +20,11 @@ static func generate_identity(rng: RandomNumberGenerator, first_override: String
 	var life_seed := int(rng.randi()) * 65537 + int(rng.randi())
 	var identity := random_item(rng, ["Woman", "Man", "Non-binary person"])
 	var pronouns: String = str({"Woman": "she/her", "Man": "he/him", "Non-binary person": "they/them"}.get(identity, "they/them"))
-	var parents := generate_parents(rng, last_name, selected_set, household)
-	var siblings := generate_siblings(rng, last_name, selected_set)
-	var stats := generate_starting_stats(rng, background, trait, challenge)
-	var appearance := generate_appearance(rng, life_seed)
-	var history := generate_origin_history(rng, first_name, last_name, birthplace, parents, siblings, background, home, challenge)
+	var parents: Array = generate_parents(rng, last_name, selected_set, household)
+	var siblings: Array = generate_siblings(rng, last_name, selected_set)
+	var stats: Dictionary = generate_starting_stats(rng, background, trait, challenge)
+	var appearance: Dictionary = generate_appearance(rng, life_seed)
+	var history: Array = generate_origin_history(rng, first_name, last_name, birthplace, parents, siblings, background, home, challenge)
 	return {
 		"life_seed": life_seed,
 		"first_name": first_name,
@@ -57,7 +57,7 @@ static func random_identity_preview() -> Dictionary:
 
 
 static func random_person_name(rng: RandomNumberGenerator, preferred_last_name: String = "") -> String:
-	var sets := name_sets()
+	var sets: Array = name_sets()
 	var selected_set: Dictionary = sets[rng.randi_range(0, sets.size() - 1)]
 	var family_name := preferred_last_name.strip_edges()
 	if family_name.is_empty() or rng.randf() < 0.34:
@@ -66,23 +66,26 @@ static func random_person_name(rng: RandomNumberGenerator, preferred_last_name: 
 
 
 static func random_first_name(rng: RandomNumberGenerator, selected_set: Dictionary = {}) -> String:
-	var source := selected_set
+	var source: Dictionary = selected_set
 	if source.is_empty():
-		var sets := name_sets()
-		source = sets[rng.randi_range(0, sets.size() - 1)]
-	return random_item(rng, source.get("first", ["Alex"]))
+		var available_sets: Array = name_sets()
+		source = available_sets[rng.randi_range(0, available_sets.size() - 1)]
+	var first_values: Array = source.get("first", ["Alex"])
+	return random_item(rng, first_values)
 
 
 static func random_last_name(rng: RandomNumberGenerator, selected_set: Dictionary = {}) -> String:
-	var source := selected_set
+	var source: Dictionary = selected_set
 	if source.is_empty():
-		var sets := name_sets()
-		source = sets[rng.randi_range(0, sets.size() - 1)]
-	var primary := random_item(rng, source.get("last", ["Morgan"]))
+		var available_sets: Array = name_sets()
+		source = available_sets[rng.randi_range(0, available_sets.size() - 1)]
+	var last_values: Array = source.get("last", ["Morgan"])
+	var primary := random_item(rng, last_values)
 	if rng.randf() < 0.16:
-		var sets := name_sets()
-		var second_set: Dictionary = sets[rng.randi_range(0, sets.size() - 1)]
-		var secondary := random_item(rng, second_set.get("last", ["Lee"]))
+		var secondary_sets: Array = name_sets()
+		var second_set: Dictionary = secondary_sets[rng.randi_range(0, secondary_sets.size() - 1)]
+		var secondary_values: Array = second_set.get("last", ["Lee"])
+		var secondary := random_item(rng, secondary_values)
 		if secondary != primary:
 			return "%s-%s" % [primary, secondary]
 	return primary

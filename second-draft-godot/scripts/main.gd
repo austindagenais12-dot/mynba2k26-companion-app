@@ -979,7 +979,8 @@ func answer_minigame(option_index: int) -> void:
 func finish_minigame() -> void:
 	var kind := str(active_minigame.get("kind", "work"))
 	var score := int(active_minigame.get("score", 0))
-	var total := active_minigame.get("rounds", []).size()
+	var minigame_rounds: Array = active_minigame.get("rounds", [])
+	var total: int = minigame_rounds.size()
 	var result: Dictionary
 	if kind == "sports":
 		result = simulation.complete_sports_session(score, total)
@@ -1099,7 +1100,7 @@ func show_new_life_dialog() -> void:
 	var warning := make_label("Every new story generates a new name, family, birthplace, background, childhood history, and portrait DNA. Edit the suggested name or reroll it; confirming replaces the current local save.", 14, MUTED, 500)
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(warning)
-	var preview := LifeGenerator.random_identity_preview()
+	var preview: Dictionary = LifeGenerator.random_identity_preview()
 	var first_input := make_line_edit(str(preview.get("first_name", "Alex")), "First name")
 	box.add_child(first_input)
 	var last_input := make_line_edit(str(preview.get("last_name", "Morgan")), "Last name")
@@ -1120,7 +1121,7 @@ func show_new_life_dialog() -> void:
 
 
 func reroll_new_character(first_input: LineEdit, last_input: LineEdit) -> void:
-	var preview := LifeGenerator.random_identity_preview()
+	var preview: Dictionary = LifeGenerator.random_identity_preview()
 	first_input.text = str(preview.get("first_name", "Alex"))
 	last_input.text = str(preview.get("last_name", "Morgan"))
 	first_input.release_focus()
