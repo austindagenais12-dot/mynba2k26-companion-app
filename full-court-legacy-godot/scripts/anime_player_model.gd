@@ -4,7 +4,7 @@ extends Node3D
 ## The public API deliberately matches the original procedural player model so the
 ## career, ball-possession, defender, and Motion Studio systems remain compatible.
 
-const AUTHORED_CLIPS := PackedStringArray([
+const AUTHORED_CLIPS := [
 	"idle",
 	"walk",
 	"sprint",
@@ -16,7 +16,7 @@ const AUTHORED_CLIPS := PackedStringArray([
 	"shot_release",
 	"defense_idle",
 	"defense_shuffle"
-])
+]
 
 const ROOT_POSITION := "AnimatedVisualRig:position"
 const TORSO_ROTATION := "AnimatedVisualRig/TorsoRoot:rotation"
@@ -188,7 +188,7 @@ func get_hand_position(side: int) -> Vector3:
 
 
 func get_authored_animation_names() -> PackedStringArray:
-	return AUTHORED_CLIPS.duplicate()
+	return PackedStringArray(AUTHORED_CLIPS)
 
 
 func get_animation_player() -> AnimationPlayer:

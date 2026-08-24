@@ -222,10 +222,10 @@ func _build_real_bleachers(gym: Node3D) -> void:
 	for side in [-1.0, 1.0]:
 		var side_name := "West" if side < 0.0 else "East"
 		for row in range(6):
-			var x := side * (7.28 + row * 0.18)
+			var x: float = side * (7.28 + row * 0.18)
 			var y := 0.24 + row * 0.29
 			for section in [-1.0, 1.0]:
-				var z := section * 5.2
+				var z: float = section * 5.2
 				_make_box(gym, "%sBleacherSeat%d" % [side_name, row], Vector3(x, y, z), Vector3(0.52, 0.12, 8.55), materials.bleacher, false)
 				_make_box(gym, "%sBleacherRiser%d" % [side_name, row], Vector3(x + side * 0.19, y - 0.14, z), Vector3(0.1, 0.3, 8.55), materials.charcoal, false)
 			var step_material: Material = materials.concrete if row % 2 == 0 else materials.acoustic
@@ -249,12 +249,12 @@ func _build_gym_windows(gym: Node3D) -> void:
 
 func _build_gym_doors(gym: Node3D) -> void:
 	for wall_side in [-1.0, 1.0]:
-		var z := wall_side * 14.32
+		var z: float = wall_side * 14.32
 		var wall_name := "South" if wall_side < 0.0 else "North"
 		for doorway_side in [-1.0, 1.0]:
-			var doorway_x := doorway_side * 5.9
+			var doorway_x: float = doorway_side * 5.9
 			for leaf in [-1.0, 1.0]:
-				var x := doorway_x + leaf * 0.55
+				var x: float = doorway_x + leaf * 0.55
 				_make_box(gym, "%sDoubleDoor" % wall_name, Vector3(x, 1.18, z), Vector3(1.02, 2.28, 0.12), materials.charcoal, false)
 				_make_box(gym, "%sDoorVisionGlass" % wall_name, Vector3(x, 1.56, z - wall_side * 0.07), Vector3(0.23, 0.62, 0.025), materials.glass, false)
 				_make_box(gym, "%sDoorPushBar" % wall_name, Vector3(x, 0.93, z - wall_side * 0.09), Vector3(0.68, 0.045, 0.04), materials.silver, false)
@@ -318,7 +318,7 @@ func _build_gym_furniture(gym: Node3D) -> void:
 	table_label.rotation.y = PI * 0.5
 	for bench_side in [-1.0, 1.0]:
 		for seat_index in range(5):
-			var z := bench_side * (4.4 + seat_index * 0.72)
+			var z: float = bench_side * (4.4 + seat_index * 0.72)
 			_make_box(gym, "TeamBenchSeat", Vector3(-6.72, 0.46, z), Vector3(0.42, 0.08, 0.62), materials.bleacher, false)
 			_make_cylinder_between(gym, "TeamBenchLeg", Vector3(-6.82, 0.08, z - 0.22), Vector3(-6.82, 0.43, z - 0.22), 0.025, materials.silver, false)
 			_make_cylinder_between(gym, "TeamBenchLeg", Vector3(-6.82, 0.08, z + 0.22), Vector3(-6.82, 0.43, z + 0.22), 0.025, materials.silver, false)
