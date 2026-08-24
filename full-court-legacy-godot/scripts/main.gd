@@ -2,6 +2,7 @@ extends Node3D
 
 const HUDScript = preload("res://scripts/hud.gd")
 const CareerStore = preload("res://scripts/career_store.gd")
+const PlayerModelScript = preload("res://scripts/player_model.gd")
 
 const SESSION_LENGTH := 120.0
 const NAVY := Color("#061735")
@@ -18,6 +19,8 @@ var rng := RandomNumberGenerator.new()
 var hud
 var player: CharacterBody3D
 var defender: CharacterBody3D
+var player_model
+var defender_model
 var ball: RigidBody3D
 var camera: Camera3D
 var score_zone: Area3D
@@ -56,6 +59,9 @@ func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_LANDSCAPE)
 	rng.randomize()
 	profile = CareerStore.load_profile()
+	if str(profile.get("player_name", "ROOKIE")) == "ROOKIE":
+		profile.player_name = "AUSTIN"
+		CareerStore.save_profile(profile)
 	_build_materials()
 	_build_environment()
 	_build_hoop()
@@ -78,6 +84,7 @@ func _physics_process(delta: float) -> void:
 	crossover_cooldown -= delta
 	_process_player(delta)
 	_process_defender(delta, now)
+	_update_character_animations(delta)
 	_process_possessed_ball(delta)
 	_process_camera(delta)
 	_process_loose_ball(delta, now)
@@ -276,64 +283,14 @@ func _build_character(character_name: String, spawn_position: Vector3, jersey_ma
 	collision.position.y = 0.95
 	character.add_child(collision)
 
-	var torso := MeshInstance3D.new()
-	var torso_mesh := CapsuleMesh.new()
-	torso_mesh.radius = 0.37
-	torso_mesh.height = 1.35
-	torso.mesh = torso_mesh
-	torso.material_override = jersey_material
-	torso.position = Vector3(0.0, 1.12, 0.0)
-	torso.scale = Vector3(0.96, 1.0, 0.76)
-	character.add_child(torso)
-
-	var stripe := MeshInstance3D.new()
-	var stripe_mesh := BoxMesh.new()
-	stripe_mesh.size = Vector3(0.13, 0.86, 0.035)
-	stripe.mesh = stripe_mesh
-	stripe.material_override = trim_material
-	stripe.position = Vector3(0.0, 1.12, -0.295)
-	character.add_child(stripe)
-
-	var head := MeshInstance3D.new()
-	var head_mesh := SphereMesh.new()
-	head_mesh.radius = 0.245
-	head_mesh.height = 0.49
-	head.mesh = head_mesh
-	head.material_override = materials.skin
-	head.position = Vector3(0.0, 2.0, 0.0)
-	character.add_child(head)
-
-	for side in [-1.0, 1.0]:
-		var arm := MeshInstance3D.new()
-		var arm_mesh := CapsuleMesh.new()
-		arm_mesh.radius = 0.105
-		arm_mesh.height = 0.78
-		arm.mesh = arm_mesh
-		arm.material_override = materials.skin
-		arm.position = Vector3(0.47 * side, 1.15, 0.0)
-		arm.rotation.z = deg_to_rad(8.0 * side)
-		character.add_child(arm)
-
-		var leg := MeshInstance3D.new()
-		var leg_mesh := CapsuleMesh.new()
-		leg_mesh.radius = 0.13
-		leg_mesh.height = 0.76
-		leg.mesh = leg_mesh
-		leg.material_override = trim_material
-		leg.position = Vector3(0.19 * side, 0.38, 0.0)
-		character.add_child(leg)
-
+	var model = PlayerModelScript.new()
+	model.name = "AustinPlayerModel" if show_number else "DefenderPlayerModel"
+	character.add_child(model)
+	model.build(jersey_material, trim_material, show_number, int(profile.get("jersey_number", 7)))
 	if show_number:
-		var number := Label3D.new()
-		number.name = "CareerNumber"
-		number.text = str(int(profile.get("jersey_number", 7)))
-		number.font_size = 72
-		number.pixel_size = 0.004
-		number.outline_size = 8
-		number.modulate = ICE
-		number.position = Vector3(0.0, 1.25, -0.315)
-		number.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		character.add_child(number)
+		player_model = model
+	else:
+		defender_model = model
 
 	return character
 
@@ -460,6 +417,8 @@ func _try_crossover() -> void:
 	bounded.z = clampf(bounded.z, -13.1, 10.9)
 	player.global_position = bounded
 	crossover_cooldown = 0.42
+	if player_model != null:
+		player_model.play_crossover(dribble_side)
 	hud.show_feedback("CROSSOVER", Color("#6FD8FF"), 0.5)
 
 func _process_shot_input(delta: float) -> void:
@@ -525,6 +484,8 @@ func _release_shot() -> void:
 	var flight_time := lerpf(0.62, 0.96, clampf(inverse_lerp(1.5, 10.5, horizontal_distance), 0.0, 1.0))
 
 	_register_shot_attempt(shot_value, feedback, feedback_color, int(round(contest * 100.0)))
+	if player_model != null:
+		player_model.play_shot_release()
 	_launch_ball(target, flight_time, shot_value)
 	hud.set_shot_meter(false, 0.0, ideal)
 
@@ -546,10 +507,20 @@ func _launch_ball(target: Vector3, flight_time: float, shot_value: int) -> void:
 func _process_possessed_ball(delta: float) -> void:
 	if not ball_possessed:
 		return
+	if charging_shot:
+		var gather_progress := clampf(shot_charge_time / 1.05, 0.0, 1.0)
+		ball.global_position = player.to_global(Vector3(0.0, lerpf(1.32, 1.84, gather_progress), -0.4))
+		ball.rotation = Vector3(dribble_phase * 0.8, dribble_phase * 0.55, 0.0)
+		return
 	dribble_phase += delta * (11.5 if is_sprinting else 8.5)
 	var bounce := absf(sin(dribble_phase))
-	var local_position := Vector3(0.48 * dribble_side, lerpf(0.16, 1.08, bounce), -0.18)
-	ball.global_position = player.to_global(local_position)
+	var hand_position: Vector3 = player_model.get_hand_position(dribble_side) if player_model != null else player.to_global(Vector3(0.48 * dribble_side, 1.08, -0.18))
+	var hand_forward := -player.global_transform.basis.z
+	hand_forward.y = 0.0
+	hand_forward = hand_forward.normalized()
+	var dribble_position := hand_position + hand_forward * 0.025
+	dribble_position.y = lerpf(0.16, maxf(0.92, hand_position.y - 0.08), bounce)
+	ball.global_position = dribble_position
 	ball.rotation = Vector3(dribble_phase * 1.55, dribble_phase * 0.96, 0.0)
 
 func _process_defender(delta: float, now: float) -> void:
@@ -586,6 +557,23 @@ func _process_defender(delta: float, now: float) -> void:
 	if bounded.y < -0.5:
 		bounded.y = 0.05
 	defender.global_position = bounded
+
+func _update_character_animations(delta: float) -> void:
+	if player_model != null:
+		var player_speed := Vector2(player.velocity.x, player.velocity.z).length()
+		var shot_progress := clampf(shot_charge_time / 1.05, 0.0, 1.0) if charging_shot else 0.0
+		player_model.update_player_animation(
+			delta,
+			player_speed / 7.1,
+			is_sprinting,
+			ball_possessed,
+			charging_shot,
+			shot_progress,
+			dribble_side
+		)
+	if defender_model != null:
+		var defender_speed := Vector2(defender.velocity.x, defender.velocity.z).length()
+		defender_model.update_defender_animation(delta, defender_speed / 4.4)
 
 func _get_contest(release_point: Vector3) -> float:
 	var defender_hand := defender.global_position + Vector3.UP * 1.55
@@ -801,4 +789,3 @@ func _random_point_in_circle(radius: float) -> Vector2:
 
 func _now() -> float:
 	return Time.get_ticks_msec() / 1000.0
-

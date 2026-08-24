@@ -5,6 +5,9 @@ An original, Android-first player-lock basketball career prototype built with Go
 ## Playable features
 
 - Third-person player-lock movement and camera
+- Corrected four-direction mobile joystick with diagonal movement
+- Austin-inspired articulated player model with swept dark hair, thick brows, full beard, moustache, and broader athletic proportions
+- Procedural idle, walk, sprint, dribble-hand, crossover, defensive-shuffle, shot-gather, jump, release, and follow-through animations
 - Mobile joystick plus sprint, crossover, shoot, and reset-ball controls
 - Keyboard equivalents for desktop testing
 - Hold/release shot timing with early, late, good, and green feedback
@@ -36,4 +39,3 @@ The `Android` export preset produces a debug-signed ARM64 APK. The accompanying 
 ## Original-game boundary
 
 Full Court Legacy is inspired by the depth and player-lock perspective of modern basketball career games, but it uses original code, names, UI, league concepts, and art. It includes no NBA, NBA 2K, team, player, logo, audio, or other licensed assets.
-

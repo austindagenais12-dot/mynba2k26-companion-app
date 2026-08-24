@@ -4,7 +4,7 @@ const SAVE_PATH := "user://full_court_legacy_career.json"
 
 static func default_profile() -> Dictionary:
 	return {
-		"player_name": "ROOKIE",
+		"player_name": "AUSTIN",
 		"position": "PG",
 		"team": "Lakeshore Raptors",
 		"jersey_number": 7,
@@ -38,4 +38,3 @@ static func save_profile(profile: Dictionary) -> void:
 		push_warning("Career save could not be opened for writing.")
 		return
 	file.store_string(JSON.stringify(profile, "\t"))
-
