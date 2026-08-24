@@ -1,0 +1,804 @@
+extends Node3D
+
+const HUDScript = preload("res://scripts/hud.gd")
+const CareerStore = preload("res://scripts/career_store.gd")
+
+const SESSION_LENGTH := 120.0
+const NAVY := Color("#061735")
+const LAKE_BLUE := Color("#0B74BB")
+const ICE := Color("#E4F5FF")
+const STEEL := Color("#596671")
+const ORANGE := Color("#E76516")
+const SKIN := Color("#885039")
+
+var materials: Dictionary = {}
+var profile: Dictionary = {}
+var rng := RandomNumberGenerator.new()
+
+var hud
+var player: CharacterBody3D
+var defender: CharacterBody3D
+var ball: RigidBody3D
+var camera: Camera3D
+var score_zone: Area3D
+var hoop_target := Vector3(0.0, 3.05, 11.72)
+
+var session_active := false
+var session_score := 0
+var session_makes := 0
+var session_attempts := 0
+var time_remaining := SESSION_LENGTH
+var session_ended_at := 0.0
+
+var ball_possessed := true
+var dribble_phase := PI * 0.5
+var dribble_side := 1
+var ball_released_at := -100.0
+var last_attempt_at := -100.0
+var ball_return_delay := -1.0
+var shot_token := 0
+var processed_score_token := -1
+var last_shot_value := 2
+
+var is_sprinting := false
+var charging_shot := false
+var previous_shoot_held := false
+var shot_charge_time := 0.0
+var crossover_cooldown := 0.0
+var previous_cross_key := false
+var previous_reset_key := false
+
+var defender_lateral_noise := Vector3.ZERO
+var defender_next_read := 0.0
+
+func _ready() -> void:
+	Engine.max_fps = 60
+	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_LANDSCAPE)
+	rng.randomize()
+	profile = CareerStore.load_profile()
+	_build_materials()
+	_build_environment()
+	_build_hoop()
+	_build_characters()
+	_build_ball()
+	_build_camera()
+	_build_hud()
+	_start_session(true)
+
+func _physics_process(delta: float) -> void:
+	var now := _now()
+	if session_active:
+		time_remaining = maxf(0.0, time_remaining - delta)
+		hud.set_clock(time_remaining)
+		if time_remaining <= 0.0:
+			_end_session()
+	elif now - session_ended_at >= 5.2:
+		_start_session(false)
+
+	crossover_cooldown -= delta
+	_process_player(delta)
+	_process_defender(delta, now)
+	_process_possessed_ball(delta)
+	_process_camera(delta)
+	_process_loose_ball(delta, now)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if not profile.is_empty():
+			CareerStore.save_profile(profile)
+
+func _exit_tree() -> void:
+	if not profile.is_empty():
+		CareerStore.save_profile(profile)
+
+func _build_materials() -> void:
+	materials.court = _make_material(Color("#A86D3C"), 0.56)
+	materials.navy = _make_material(NAVY, 0.42)
+	materials.blue = _make_material(LAKE_BLUE, 0.38)
+	materials.ice = _make_material(ICE, 0.32)
+	materials.steel = _make_material(STEEL, 0.3, 0.14)
+	materials.orange = _make_material(ORANGE, 0.5)
+	materials.skin = _make_material(SKIN, 0.52)
+	materials.line = _make_material(ICE, 0.75, 0.0, true)
+	materials.dark = _make_material(Color("#0B1018"), 0.62)
+	materials.green = _make_material(Color("#35FF6C"), 0.5, 0.0, true)
+
+func _build_environment() -> void:
+	var world_environment := WorldEnvironment.new()
+	world_environment.name = "GymEnvironment"
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color("#030815")
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color("#A8C4DD")
+	environment.ambient_light_energy = 0.62
+	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	world_environment.environment = environment
+	add_child(world_environment)
+
+	var key_light := DirectionalLight3D.new()
+	key_light.name = "GymKeyLight"
+	key_light.light_color = Color("#EFF8FF")
+	key_light.light_energy = 1.2
+	key_light.shadow_enabled = true
+	key_light.rotation_degrees = Vector3(-48.0, -28.0, 0.0)
+	add_child(key_light)
+
+	for index in range(-1, 2):
+		var fill := OmniLight3D.new()
+		fill.name = "CeilingFill%d" % index
+		fill.position = Vector3(index * 5.0, 7.0, 0.0)
+		fill.omni_range = 15.0
+		fill.light_energy = 4.2
+		fill.light_color = Color("#BFE6FF")
+		fill.shadow_enabled = false
+		add_child(fill)
+
+	var gym := Node3D.new()
+	gym.name = "LakeshoreOpenGym"
+	add_child(gym)
+
+	_make_box(gym, "Court", Vector3(0.0, -0.08, 0.0), Vector3(15.2, 0.16, 28.4), materials.court, true)
+	_make_box(gym, "NorthPadding", Vector3(0.0, 1.1, 14.25), Vector3(15.8, 2.2, 0.25), materials.navy, true)
+	_make_box(gym, "SouthPadding", Vector3(0.0, 1.1, -14.25), Vector3(15.8, 2.2, 0.25), materials.navy, true)
+	_make_box(gym, "WestWall", Vector3(-8.1, 2.4, 0.0), Vector3(0.24, 4.8, 29.0), materials.steel, true)
+	_make_box(gym, "EastWall", Vector3(8.1, 2.4, 0.0), Vector3(0.24, 4.8, 29.0), materials.steel, true)
+	_make_box(gym, "NorthAccent", Vector3(0.0, 2.35, 14.08), Vector3(8.5, 0.18, 0.08), materials.blue, false)
+	_make_box(gym, "SouthAccent", Vector3(0.0, 2.35, -14.08), Vector3(8.5, 0.18, 0.08), materials.blue, false)
+
+	for index in range(4):
+		var y := 0.35 + index * 0.42
+		var x := 7.45 + index * 0.18
+		_make_box(gym, "EastBleacher%d" % index, Vector3(x, y, 0.0), Vector3(0.75, 0.22, 19.0), materials.navy, false)
+		_make_box(gym, "WestBleacher%d" % index, Vector3(-x, y, 0.0), Vector3(0.75, 0.22, 19.0), materials.blue, false)
+
+	for z in [-9.5, -3.2, 3.2, 9.5]:
+		_make_box(gym, "CeilingBeam", Vector3(0.0, 6.8, z), Vector3(16.2, 0.15, 0.18), materials.steel, false)
+		for x in [-5.2, 0.0, 5.2]:
+			_make_box(gym, "LightPanel", Vector3(x, 6.68, z), Vector3(2.2, 0.05, 0.42), materials.ice, false)
+
+	var line_y := 0.012
+	_make_polyline(gym, [
+		Vector3(-7.2, line_y, -13.6), Vector3(7.2, line_y, -13.6),
+		Vector3(7.2, line_y, 13.6), Vector3(-7.2, line_y, 13.6)
+	], 0.055, materials.line, true)
+	_make_polyline(gym, [Vector3(-7.2, line_y, 0.0), Vector3(7.2, line_y, 0.0)], 0.05, materials.line, false)
+	_make_polyline(gym, _circle_points(Vector3(0.0, line_y, 0.0), 1.8, 56), 0.05, materials.line, true)
+	_build_key_lines(gym, line_y, 1.0)
+	_build_key_lines(gym, line_y, -1.0)
+	_build_three_point_line(gym, line_y, 1.0)
+	_build_three_point_line(gym, line_y, -1.0)
+
+	var logo_outer := _make_box(gym, "CentreLogoPlate", Vector3(0.0, 0.002, 0.0), Vector3(3.1, 0.025, 3.1), materials.navy, false)
+	logo_outer.rotation.y = deg_to_rad(45.0)
+	var logo_inner := _make_box(gym, "CentreLogoInset", Vector3(0.0, 0.02, 0.0), Vector3(2.15, 0.018, 2.15), materials.blue, false)
+	logo_inner.rotation.y = deg_to_rad(45.0)
+	_make_box(gym, "CentreMark", Vector3(0.0, 0.035, 0.0), Vector3(0.38, 0.02, 2.0), materials.ice, false).rotation.y = deg_to_rad(45.0)
+
+	var gym_label := Label3D.new()
+	gym_label.name = "LakeshoreWordmark"
+	gym_label.text = "LAKESHORE RAPTORS  •  OPEN GYM"
+	gym_label.font_size = 74
+	gym_label.pixel_size = 0.006
+	gym_label.outline_size = 12
+	gym_label.modulate = ICE
+	gym_label.position = Vector3(0.0, 4.65, 13.95)
+	gym_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(gym_label)
+
+func _build_key_lines(parent: Node3D, y: float, direction: float) -> void:
+	var baseline := direction * 13.6
+	var free_throw := direction * 8.8
+	_make_polyline(parent, [
+		Vector3(-2.45, y, baseline), Vector3(-2.45, y, free_throw),
+		Vector3(2.45, y, free_throw), Vector3(2.45, y, baseline)
+	], 0.05, materials.line, false)
+	_make_polyline(parent, _circle_points(Vector3(0.0, y, free_throw), 1.8, 44), 0.05, materials.line, true)
+
+func _build_three_point_line(parent: Node3D, y: float, direction: float) -> void:
+	var points: Array = []
+	var hoop_z := direction * 11.75
+	points.append(Vector3(-6.65, y, direction * 13.6))
+	points.append(Vector3(-6.65, y, direction * 10.25))
+	var segments := 42
+	for index in range(segments + 1):
+		var angle := lerpf(PI, 0.0, float(index) / float(segments))
+		points.append(Vector3(cos(angle) * 6.75, y, hoop_z - direction * sin(angle) * 6.75))
+	points.append(Vector3(6.65, y, direction * 13.6))
+	_make_polyline(parent, points, 0.05, materials.line, false)
+
+func _build_hoop() -> void:
+	var assembly := Node3D.new()
+	assembly.name = "NorthBasket"
+	add_child(assembly)
+
+	_make_box(assembly, "SupportBase", Vector3(0.0, 0.35, 13.25), Vector3(1.1, 0.7, 0.85), materials.steel, true)
+	_make_box(assembly, "SupportPole", Vector3(0.0, 2.15, 13.15), Vector3(0.18, 3.7, 0.18), materials.steel, true)
+	_make_box(assembly, "SupportArm", Vector3(0.0, 3.65, 12.7), Vector3(0.16, 0.16, 1.05), materials.steel, true)
+	_make_box(assembly, "Backboard", Vector3(0.0, 3.42, 12.38), Vector3(1.82, 1.05, 0.08), materials.ice, true)
+	_make_box(assembly, "BoardSquareOuter", Vector3(0.0, 3.28, 12.325), Vector3(0.66, 0.5, 0.018), materials.orange, false)
+	_make_box(assembly, "BoardSquareInner", Vector3(0.0, 3.28, 12.31), Vector3(0.52, 0.36, 0.02), materials.ice, false)
+
+	var rim_radius := 0.245
+	var rim_segments := 18
+	for index in range(rim_segments):
+		var a_angle := TAU * float(index) / float(rim_segments)
+		var b_angle := TAU * float(index + 1) / float(rim_segments)
+		var a := hoop_target + Vector3(cos(a_angle) * rim_radius, 0.0, sin(a_angle) * rim_radius)
+		var b := hoop_target + Vector3(cos(b_angle) * rim_radius, 0.0, sin(b_angle) * rim_radius)
+		_make_cylinder_between(assembly, "Rim%d" % index, a, b, 0.027, materials.orange, true)
+
+	for index in range(12):
+		var angle := TAU * float(index) / 12.0
+		var top := hoop_target + Vector3(cos(angle) * 0.22, -0.03, sin(angle) * 0.22)
+		var bottom := hoop_target + Vector3(cos(angle) * 0.13, -0.48, sin(angle) * 0.13)
+		_make_cylinder_between(assembly, "NetCord%d" % index, top, bottom, 0.008, materials.ice, false)
+	for index in range(12):
+		var angle := TAU * (float(index) + 0.5) / 12.0
+		var a := hoop_target + Vector3(cos(angle) * 0.205, -0.19, sin(angle) * 0.205)
+		var b := hoop_target + Vector3(cos(angle) * 0.145, -0.38, sin(angle) * 0.145)
+		_make_cylinder_between(assembly, "NetCross%d" % index, a, b, 0.006, materials.ice, false)
+
+	score_zone = Area3D.new()
+	score_zone.name = "ScoreZone"
+	score_zone.position = hoop_target + Vector3(0.0, -0.23, 0.0)
+	score_zone.collision_layer = 0
+	score_zone.collision_mask = 4
+	score_zone.monitoring = true
+	var zone_shape := CollisionShape3D.new()
+	var zone_box := BoxShape3D.new()
+	zone_box.size = Vector3(0.34, 0.2, 0.34)
+	zone_shape.shape = zone_box
+	score_zone.add_child(zone_shape)
+	add_child(score_zone)
+	score_zone.body_entered.connect(_on_score_zone_body_entered)
+
+func _build_characters() -> void:
+	player = _build_character("CareerPlayer", Vector3(0.0, 0.05, -4.2), materials.blue, materials.navy, true)
+	defender = _build_character("AIDefender", Vector3(0.0, 0.05, 3.2), materials.steel, materials.navy, false)
+	add_child(player)
+	add_child(defender)
+
+func _build_character(character_name: String, spawn_position: Vector3, jersey_material: Material, trim_material: Material, show_number: bool) -> CharacterBody3D:
+	var character := CharacterBody3D.new()
+	character.name = character_name
+	character.position = spawn_position
+	character.collision_layer = 2
+	character.collision_mask = 1
+	character.floor_snap_length = 0.22
+	character.floor_max_angle = deg_to_rad(48.0)
+
+	var collision := CollisionShape3D.new()
+	var capsule_shape := CapsuleShape3D.new()
+	capsule_shape.radius = 0.34
+	capsule_shape.height = 1.9
+	collision.shape = capsule_shape
+	collision.position.y = 0.95
+	character.add_child(collision)
+
+	var torso := MeshInstance3D.new()
+	var torso_mesh := CapsuleMesh.new()
+	torso_mesh.radius = 0.37
+	torso_mesh.height = 1.35
+	torso.mesh = torso_mesh
+	torso.material_override = jersey_material
+	torso.position = Vector3(0.0, 1.12, 0.0)
+	torso.scale = Vector3(0.96, 1.0, 0.76)
+	character.add_child(torso)
+
+	var stripe := MeshInstance3D.new()
+	var stripe_mesh := BoxMesh.new()
+	stripe_mesh.size = Vector3(0.13, 0.86, 0.035)
+	stripe.mesh = stripe_mesh
+	stripe.material_override = trim_material
+	stripe.position = Vector3(0.0, 1.12, -0.295)
+	character.add_child(stripe)
+
+	var head := MeshInstance3D.new()
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.245
+	head_mesh.height = 0.49
+	head.mesh = head_mesh
+	head.material_override = materials.skin
+	head.position = Vector3(0.0, 2.0, 0.0)
+	character.add_child(head)
+
+	for side in [-1.0, 1.0]:
+		var arm := MeshInstance3D.new()
+		var arm_mesh := CapsuleMesh.new()
+		arm_mesh.radius = 0.105
+		arm_mesh.height = 0.78
+		arm.mesh = arm_mesh
+		arm.material_override = materials.skin
+		arm.position = Vector3(0.47 * side, 1.15, 0.0)
+		arm.rotation.z = deg_to_rad(8.0 * side)
+		character.add_child(arm)
+
+		var leg := MeshInstance3D.new()
+		var leg_mesh := CapsuleMesh.new()
+		leg_mesh.radius = 0.13
+		leg_mesh.height = 0.76
+		leg.mesh = leg_mesh
+		leg.material_override = trim_material
+		leg.position = Vector3(0.19 * side, 0.38, 0.0)
+		character.add_child(leg)
+
+	if show_number:
+		var number := Label3D.new()
+		number.name = "CareerNumber"
+		number.text = str(int(profile.get("jersey_number", 7)))
+		number.font_size = 72
+		number.pixel_size = 0.004
+		number.outline_size = 8
+		number.modulate = ICE
+		number.position = Vector3(0.0, 1.25, -0.315)
+		number.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		character.add_child(number)
+
+	return character
+
+func _build_ball() -> void:
+	ball = RigidBody3D.new()
+	ball.name = "Basketball"
+	ball.mass = 0.62
+	ball.linear_damp = 0.025
+	ball.angular_damp = 0.05
+	ball.continuous_cd = true
+	ball.can_sleep = true
+	ball.collision_layer = 4
+	ball.collision_mask = 1
+	ball.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+	ball.freeze = true
+
+	var physics_material := PhysicsMaterial.new()
+	physics_material.bounce = 0.78
+	physics_material.friction = 0.6
+	ball.physics_material_override = physics_material
+
+	var mesh_instance := MeshInstance3D.new()
+	var sphere_mesh := SphereMesh.new()
+	sphere_mesh.radius = 0.12
+	sphere_mesh.height = 0.24
+	sphere_mesh.radial_segments = 24
+	sphere_mesh.rings = 12
+	mesh_instance.mesh = sphere_mesh
+	mesh_instance.material_override = materials.orange
+	ball.add_child(mesh_instance)
+
+	var collision := CollisionShape3D.new()
+	var sphere_shape := SphereShape3D.new()
+	sphere_shape.radius = 0.12
+	collision.shape = sphere_shape
+	ball.add_child(collision)
+	add_child(ball)
+
+func _build_camera() -> void:
+	camera = Camera3D.new()
+	camera.name = "PlayerLockCamera"
+	camera.fov = 56.0
+	camera.near = 0.08
+	camera.far = 120.0
+	camera.current = true
+	add_child(camera)
+	var attack_direction := (hoop_target - player.global_position)
+	attack_direction.y = 0.0
+	attack_direction = attack_direction.normalized()
+	camera.global_position = player.global_position - attack_direction * 7.4 + Vector3.UP * 6.2
+	camera.look_at(player.global_position + Vector3.UP * 1.05 + attack_direction * 2.6, Vector3.UP)
+
+func _build_hud() -> void:
+	hud = HUDScript.new()
+	hud.name = "HUD"
+	add_child(hud)
+	hud.build(profile)
+
+func _process_player(delta: float) -> void:
+	var keyboard_input := Vector2(
+		float(Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT)) - float(Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)),
+		float(Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP)) - float(Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN))
+	).limit_length(1.0)
+	var move_input: Vector2 = hud.move_input
+	if keyboard_input.length_squared() > move_input.length_squared():
+		move_input = keyboard_input
+
+	var camera_forward := -camera.global_transform.basis.z
+	var camera_right := camera.global_transform.basis.x
+	camera_forward.y = 0.0
+	camera_right.y = 0.0
+	camera_forward = camera_forward.normalized()
+	camera_right = camera_right.normalized()
+	var move_direction := (camera_forward * move_input.y + camera_right * move_input.x).limit_length(1.0)
+
+	var sprint_input: bool = hud.sprint_held or Input.is_key_pressed(KEY_SHIFT)
+	is_sprinting = sprint_input and move_direction.length_squared() > 0.1 and not charging_shot
+	var base_speed := lerpf(3.5, 5.4, inverse_lerp(25.0, 99.0, 72.0))
+	var move_speed := base_speed * (1.3 if is_sprinting else 1.0)
+	if charging_shot:
+		move_speed *= 0.18
+
+	player.velocity.x = move_direction.x * move_speed
+	player.velocity.z = move_direction.z * move_speed
+	if player.is_on_floor():
+		player.velocity.y = -0.6
+	else:
+		player.velocity.y -= 18.0 * delta
+	player.move_and_slide()
+
+	if move_direction.length_squared() > 0.02 and not charging_shot:
+		player.look_at(player.global_position + move_direction, Vector3.UP)
+
+	var bounded := player.global_position
+	bounded.x = clampf(bounded.x, -6.85, 6.85)
+	bounded.z = clampf(bounded.z, -13.1, 10.9)
+	if bounded.y < -0.5:
+		bounded.y = 0.05
+	player.global_position = bounded
+
+	var cross_key := Input.is_key_pressed(KEY_E)
+	var cross_requested: bool = hud.consume_crossover() or (cross_key and not previous_cross_key)
+	previous_cross_key = cross_key
+	if cross_requested:
+		_try_crossover()
+
+	var reset_key := Input.is_key_pressed(KEY_R)
+	var reset_requested: bool = hud.consume_reset() or (reset_key and not previous_reset_key)
+	previous_reset_key = reset_key
+	if reset_requested:
+		_return_ball_to_player()
+
+	_process_shot_input(delta)
+
+func _try_crossover() -> void:
+	if not ball_possessed or crossover_cooldown > 0.0 or charging_shot:
+		return
+	dribble_side *= -1
+	dribble_phase = PI * 0.5
+	var burst := lerpf(0.28, 0.5, inverse_lerp(25.0, 99.0, 68.0))
+	player.global_position += player.global_transform.basis.x * dribble_side * burst
+	var bounded := player.global_position
+	bounded.x = clampf(bounded.x, -6.85, 6.85)
+	bounded.z = clampf(bounded.z, -13.1, 10.9)
+	player.global_position = bounded
+	crossover_cooldown = 0.42
+	hud.show_feedback("CROSSOVER", Color("#6FD8FF"), 0.5)
+
+func _process_shot_input(delta: float) -> void:
+	var shoot_held: bool = hud.shoot_held or Input.is_key_pressed(KEY_SPACE)
+	if shoot_held and not previous_shoot_held and ball_possessed and session_active:
+		charging_shot = true
+		shot_charge_time = 0.0
+
+	if charging_shot:
+		shot_charge_time += delta
+		var meter := clampf(shot_charge_time / 1.05, 0.0, 1.0)
+		var ideal := _get_ideal_release()
+		hud.set_shot_meter(true, meter, ideal)
+		var face_hoop := hoop_target - player.global_position
+		face_hoop.y = 0.0
+		if face_hoop.length_squared() > 0.01:
+			player.look_at(player.global_position + face_hoop.normalized(), Vector3.UP)
+
+	if not shoot_held and previous_shoot_held and charging_shot:
+		_release_shot()
+	elif charging_shot and shot_charge_time > 1.35:
+		_release_shot()
+
+	previous_shoot_held = shoot_held
+
+func _get_ideal_release() -> float:
+	var distance := player.global_position.distance_to(hoop_target)
+	return lerpf(0.62, 0.79, clampf(inverse_lerp(1.5, 9.5, distance), 0.0, 1.0))
+
+func _release_shot() -> void:
+	if not charging_shot or not ball_possessed:
+		charging_shot = false
+		hud.set_shot_meter(false, 0.0, 0.72)
+		return
+
+	charging_shot = false
+	var meter := clampf(shot_charge_time / 1.05, 0.0, 1.0)
+	var ideal := _get_ideal_release()
+	var timing_error := absf(meter - ideal)
+	var contest := _get_contest(player.global_position + Vector3.UP * 1.7)
+	var rating_help := inverse_lerp(25.0, 99.0, 66.0) * 0.08
+	var effective_error := maxf(0.0, timing_error - rating_help) + contest * 0.16
+	var green_window := lerpf(0.035, 0.075, inverse_lerp(25.0, 99.0, 66.0))
+	var green := timing_error <= green_window and contest < 0.55
+
+	var feedback := "GOOD"
+	var feedback_color := Color("#6FD8FF")
+	if green:
+		feedback = "GREEN"
+		feedback_color = Color("#35FF6C")
+	elif meter < ideal - 0.09:
+		feedback = "EARLY"
+		feedback_color = Color("#FFAD2E")
+	elif meter > ideal + 0.09:
+		feedback = "LATE"
+		feedback_color = Color("#FF6A33")
+
+	var horizontal_distance := Vector2(player.global_position.x, player.global_position.z).distance_to(Vector2(hoop_target.x, hoop_target.z))
+	var shot_value := 3 if horizontal_distance >= 6.75 else 2
+	var miss_radius := 0.0 if green else lerpf(0.04, 0.72, clampf(effective_error * 2.4, 0.0, 1.0))
+	var random_error := _random_point_in_circle(miss_radius)
+	var target := hoop_target + Vector3(random_error.x, 0.08, random_error.y)
+	var flight_time := lerpf(0.62, 0.96, clampf(inverse_lerp(1.5, 10.5, horizontal_distance), 0.0, 1.0))
+
+	_register_shot_attempt(shot_value, feedback, feedback_color, int(round(contest * 100.0)))
+	_launch_ball(target, flight_time, shot_value)
+	hud.set_shot_meter(false, 0.0, ideal)
+
+func _launch_ball(target: Vector3, flight_time: float, shot_value: int) -> void:
+	var release_position := player.to_global(Vector3(0.32 * dribble_side, 1.72, -0.22))
+	ball.global_position = release_position
+	last_shot_value = shot_value
+	ball_possessed = false
+	ball_released_at = _now()
+	shot_token += 1
+	ball.freeze = false
+	ball.sleeping = false
+	var safe_time := maxf(0.4, flight_time)
+	var displacement := target - release_position
+	var gravity := Vector3(0.0, -float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)), 0.0)
+	ball.linear_velocity = displacement / safe_time - gravity * (safe_time * 0.5)
+	ball.angular_velocity = Vector3(10.0, 2.0, -6.0)
+
+func _process_possessed_ball(delta: float) -> void:
+	if not ball_possessed:
+		return
+	dribble_phase += delta * (11.5 if is_sprinting else 8.5)
+	var bounce := absf(sin(dribble_phase))
+	var local_position := Vector3(0.48 * dribble_side, lerpf(0.16, 1.08, bounce), -0.18)
+	ball.global_position = player.to_global(local_position)
+	ball.rotation = Vector3(dribble_phase * 1.55, dribble_phase * 0.96, 0.0)
+
+func _process_defender(delta: float, now: float) -> void:
+	if not session_active:
+		defender.velocity = Vector3.ZERO
+		return
+	if now >= defender_next_read:
+		defender_lateral_noise = Vector3(rng.randf_range(-0.22, 0.22), 0.0, rng.randf_range(-0.22, 0.22))
+		defender_next_read = now + rng.randf_range(0.22, 0.48)
+
+	var toward_hoop := hoop_target - player.global_position
+	toward_hoop.y = 0.0
+	var ideal := player.global_position + toward_hoop.normalized() * 1.25 + defender_lateral_noise
+	ideal.z = minf(ideal.z, 10.7)
+	var delta_position := ideal - defender.global_position
+	delta_position.y = 0.0
+	var speed := 4.25 if is_sprinting else 3.65
+	var movement := delta_position.limit_length(1.0) * speed
+	defender.velocity.x = movement.x
+	defender.velocity.z = movement.z
+	if defender.is_on_floor():
+		defender.velocity.y = -0.6
+	else:
+		defender.velocity.y -= 18.0 * delta
+	defender.move_and_slide()
+
+	var face_player := player.global_position - defender.global_position
+	face_player.y = 0.0
+	if face_player.length_squared() > 0.01:
+		defender.look_at(defender.global_position + face_player.normalized(), Vector3.UP)
+	var bounded := defender.global_position
+	bounded.x = clampf(bounded.x, -6.8, 6.8)
+	bounded.z = clampf(bounded.z, -12.8, 10.9)
+	if bounded.y < -0.5:
+		bounded.y = 0.05
+	defender.global_position = bounded
+
+func _get_contest(release_point: Vector3) -> float:
+	var defender_hand := defender.global_position + Vector3.UP * 1.55
+	var distance := defender_hand.distance_to(release_point)
+	var proximity := 1.0 - clampf(inverse_lerp(0.55, 2.6, distance), 0.0, 1.0)
+	var to_release := (release_point - (defender.global_position + Vector3.UP * 1.2)).normalized()
+	var defender_forward := -defender.global_transform.basis.z
+	var facing := clampf(inverse_lerp(-0.1, 0.8, defender_forward.dot(to_release)), 0.0, 1.0)
+	return clampf(proximity * lerpf(0.65, 1.0, facing), 0.0, 1.0)
+
+func _process_camera(delta: float) -> void:
+	var attack_direction := hoop_target - player.global_position
+	attack_direction.y = 0.0
+	if attack_direction.length_squared() < 0.01:
+		attack_direction = Vector3.FORWARD
+	else:
+		attack_direction = attack_direction.normalized()
+	var desired_position := player.global_position - attack_direction * 7.4 + Vector3.UP * 6.2
+	var follow_weight := 1.0 - exp(-delta * 7.0)
+	camera.global_position = camera.global_position.lerp(desired_position, follow_weight)
+	var look_target := player.global_position + Vector3.UP * 1.05 + attack_direction * 2.6
+	camera.look_at(look_target, Vector3.UP)
+
+func _process_loose_ball(delta: float, now: float) -> void:
+	if ball_return_delay >= 0.0:
+		ball_return_delay -= delta
+		if ball_return_delay <= 0.0:
+			_return_ball_to_player()
+		return
+	if ball_possessed:
+		return
+
+	var ball_position := ball.global_position
+	var out_of_bounds := absf(ball_position.x) > 8.2 or absf(ball_position.z) > 15.4 or ball_position.y < -1.5
+	if out_of_bounds:
+		_return_ball_to_player()
+		return
+	var distance := (player.global_position + Vector3.UP * 0.4).distance_to(ball_position)
+	if now - ball_released_at > 0.55 and distance < 1.15 and ball.linear_velocity.length() < 7.0:
+		_return_ball_to_player()
+		return
+	if now - last_attempt_at > 4.8:
+		_return_ball_to_player()
+
+func _on_score_zone_body_entered(body: Node3D) -> void:
+	if body != ball or not session_active or ball_possessed:
+		return
+	if ball.linear_velocity.y >= -0.15 or processed_score_token == shot_token:
+		return
+	processed_score_token = shot_token
+	session_score += last_shot_value
+	session_makes += 1
+	profile.field_goals_made = int(profile.get("field_goals_made", 0)) + 1
+	profile.career_points = int(profile.get("career_points", 0)) + last_shot_value
+	profile.xp = int(profile.get("xp", 0)) + (30 if last_shot_value == 3 else 20)
+	CareerStore.save_profile(profile)
+	hud.set_score(session_score)
+	hud.set_attempt_stats(session_makes, session_attempts)
+	hud.refresh_profile(profile)
+	hud.show_feedback("+%d  BUCKET" % last_shot_value, Color("#35FF75"), 1.1)
+	ball_return_delay = 1.05
+
+func _register_shot_attempt(_shot_value: int, timing: String, timing_color: Color, contest_percent: int) -> void:
+	if not session_active:
+		return
+	session_attempts += 1
+	profile.field_goals_attempted = int(profile.get("field_goals_attempted", 0)) + 1
+	last_attempt_at = _now()
+	var contest_label := "OPEN" if contest_percent <= 4 else "%d%% COVERED" % contest_percent
+	hud.set_attempt_stats(session_makes, session_attempts)
+	hud.show_feedback("%s  •  %s" % [timing, contest_label], timing_color, 1.15)
+	CareerStore.save_profile(profile)
+
+func _start_session(first_session: bool) -> void:
+	session_active = true
+	session_score = 0
+	session_makes = 0
+	session_attempts = 0
+	time_remaining = SESSION_LENGTH
+	last_attempt_at = -100.0
+	ball_return_delay = -1.0
+	hud.set_score(0)
+	hud.set_clock(time_remaining)
+	hud.set_attempt_stats(0, 0)
+	hud.refresh_profile(profile)
+	_return_ball_to_player()
+	if not first_session:
+		hud.show_feedback("NEW OPEN-GYM SESSION", ICE, 1.2)
+
+func _end_session() -> void:
+	if not session_active:
+		return
+	session_active = false
+	var before_xp := int(profile.get("xp", 0))
+	profile.sessions_played = int(profile.get("sessions_played", 0)) + 1
+	profile.xp = before_xp + maxi(10, session_score * 2)
+	CareerStore.save_profile(profile)
+	hud.refresh_profile(profile)
+	hud.show_session_complete(session_score, int(profile.xp) - before_xp)
+	session_ended_at = _now()
+
+func _return_ball_to_player() -> void:
+	if ball == null or player == null:
+		return
+	ball_return_delay = -1.0
+	ball_possessed = true
+	ball.freeze = true
+	ball.linear_velocity = Vector3.ZERO
+	ball.angular_velocity = Vector3.ZERO
+	dribble_phase = PI * 0.5
+	dribble_side = 1
+	ball.global_position = player.to_global(Vector3(0.48, 1.05, -0.18))
+	last_attempt_at = -100.0
+	charging_shot = false
+	shot_charge_time = 0.0
+	if hud != null:
+		hud.set_shot_meter(false, 0.0, 0.72)
+
+func _make_material(color: Color, roughness: float, metallic := 0.0, unshaded := false) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = roughness
+	material.metallic = metallic
+	if unshaded:
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return material
+
+func _make_box(parent: Node3D, object_name: String, position: Vector3, size: Vector3, material: Material, collision_enabled: bool) -> MeshInstance3D:
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = object_name
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh_instance.mesh = mesh
+	mesh_instance.material_override = material
+	mesh_instance.position = position
+	parent.add_child(mesh_instance)
+	if collision_enabled:
+		var body := StaticBody3D.new()
+		body.name = object_name + "Body"
+		body.position = position
+		body.collision_layer = 1
+		body.collision_mask = 6
+		var collision := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = size
+		collision.shape = shape
+		body.add_child(collision)
+		parent.add_child(body)
+	return mesh_instance
+
+func _make_cylinder_between(parent: Node3D, object_name: String, start: Vector3, finish: Vector3, radius: float, material: Material, collision_enabled: bool) -> MeshInstance3D:
+	var direction := finish - start
+	var length := direction.length()
+	var rotation := Quaternion(Vector3.UP, direction.normalized())
+	var midpoint := (start + finish) * 0.5
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = object_name
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = length
+	mesh.radial_segments = 8
+	mesh_instance.mesh = mesh
+	mesh_instance.material_override = material
+	mesh_instance.position = midpoint
+	mesh_instance.quaternion = rotation
+	parent.add_child(mesh_instance)
+	if collision_enabled:
+		var body := StaticBody3D.new()
+		body.name = object_name + "Body"
+		body.position = midpoint
+		body.quaternion = rotation
+		body.collision_layer = 1
+		body.collision_mask = 4
+		var collision := CollisionShape3D.new()
+		var shape := CylinderShape3D.new()
+		shape.radius = radius
+		shape.height = length
+		collision.shape = shape
+		body.add_child(collision)
+		parent.add_child(body)
+	return mesh_instance
+
+func _make_polyline(parent: Node3D, points: Array, width: float, material: Material, closed: bool) -> void:
+	if points.size() < 2:
+		return
+	for index in range(points.size() - 1):
+		_make_floor_line(parent, points[index], points[index + 1], width, material)
+	if closed:
+		_make_floor_line(parent, points[points.size() - 1], points[0], width, material)
+
+func _make_floor_line(parent: Node3D, start: Vector3, finish: Vector3, width: float, material: Material) -> void:
+	var delta := finish - start
+	var length := Vector2(delta.x, delta.z).length()
+	if length <= 0.001:
+		return
+	var line := _make_box(parent, "CourtLine", (start + finish) * 0.5, Vector3(length, 0.014, width), material, false)
+	line.rotation.y = -atan2(delta.z, delta.x)
+
+func _circle_points(center: Vector3, radius: float, segments: int) -> Array:
+	var points: Array = []
+	for index in range(segments):
+		var angle := TAU * float(index) / float(segments)
+		points.append(center + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius))
+	return points
+
+func _random_point_in_circle(radius: float) -> Vector2:
+	if radius <= 0.0:
+		return Vector2.ZERO
+	var angle := rng.randf_range(0.0, TAU)
+	var distance := sqrt(rng.randf()) * radius
+	return Vector2(cos(angle), sin(angle)) * distance
+
+func _now() -> float:
+	return Time.get_ticks_msec() / 1000.0
+
