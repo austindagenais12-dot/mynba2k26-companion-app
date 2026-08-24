@@ -13,6 +13,9 @@ const ROSE := Color("ef7184")
 const BLUE := Color("5ea9dd")
 const LINE := Color("29465e")
 const CAREERS_PER_PAGE := 14
+const KEYBOARD_FALLBACK_PADDING := 430
+const INPUT_REVEAL_MARGIN := 28
+const NORMAL_SCROLL_PADDING := 24
 
 var simulation: LifeSimulation
 var current_page := "life"
@@ -27,9 +30,16 @@ var career_query := ""
 var career_sector := "All sectors"
 var career_eligible_only := false
 var career_page := 0
+var active_page_scroll: ScrollContainer
+var page_scroll_positions: Dictionary = {}
+var scroll_spacers: Dictionary = {}
+var focused_text_input: Control
+var focus_reveal_serial := 0
 
 
 func _ready() -> void:
+	get_viewport().gui_focus_changed.connect(on_gui_focus_changed)
+	get_viewport().size_changed.connect(on_viewport_size_changed)
 	simulation = LifeSimulation.new()
 	if not simulation.load_game():
 		simulation.new_life()
@@ -152,7 +162,9 @@ func build_toast() -> void:
 
 
 func show_page(page_name: String) -> void:
+	remember_page_scroll()
 	current_page = page_name
+	active_page_scroll = null
 	clear_children(page_host)
 	update_top_bar()
 	update_nav()
@@ -167,6 +179,7 @@ func show_page(page_name: String) -> void:
 			build_assets_page()
 		_:
 			build_life_page()
+	call_deferred("restore_page_scroll", page_name)
 
 
 func update_top_bar() -> void:
@@ -299,6 +312,7 @@ func build_stat_meter(title: String, value: int, color: Color) -> Control:
 	row.add_child(label)
 	row.add_child(make_label("%d" % value, 12, TEXT, 800))
 	var bar := ProgressBar.new()
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.min_value = 0
 	bar.max_value = 100
 	bar.value = value
@@ -461,6 +475,7 @@ func build_current_work_card() -> Control:
 	box.add_child(make_key_value("ANNUAL PAY", simulation.format_money(int(job.get("salary", 0))) if not job.is_empty() else "$0", GOLD))
 	if not job.is_empty() and not bool(simulation.data.get("retired", false)):
 		var progress := ProgressBar.new()
+		progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		progress.max_value = 100
 		progress.value = int(simulation.data.get("job_progress", 0))
 		progress.show_percentage = false
@@ -531,6 +546,7 @@ func build_career_filters() -> Control:
 	filter_row.add_theme_constant_override("separation", 8)
 	box.add_child(filter_row)
 	var sector_select := OptionButton.new()
+	sector_select.mouse_filter = Control.MOUSE_FILTER_PASS
 	sector_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sector_select.custom_minimum_size.y = 54
 	sector_select.add_theme_font_size_override("font_size", 13)
@@ -549,6 +565,7 @@ func build_career_filters() -> Control:
 	search_button.pressed.connect(on_career_search.bind(search, sector_select))
 	filter_row.add_child(search_button)
 	var eligible := CheckButton.new()
+	eligible.mouse_filter = Control.MOUSE_FILTER_PASS
 	eligible.text = "Only show careers my education currently qualifies for"
 	eligible.button_pressed = career_eligible_only
 	eligible.add_theme_font_size_override("font_size", 12)
@@ -719,6 +736,8 @@ func on_career_search(search: LineEdit, sector_select: OptionButton) -> void:
 	career_query = search.text.strip_edges()
 	career_sector = sector_select.get_item_text(sector_select.selected)
 	career_page = 0
+	search.release_focus()
+	DisplayServer.virtual_keyboard_hide()
 	show_page("work")
 
 
@@ -758,12 +777,8 @@ func show_event_dialog(event: Dictionary) -> void:
 	overlay.z_index = 100
 	add_child(overlay)
 
-	var outer_margin := MarginContainer.new()
-	outer_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	set_margins(outer_margin, 38, 88, 38, 58)
-	overlay.add_child(outer_margin)
-	var center := CenterContainer.new()
-	outer_margin.add_child(center)
+	var dialog_layout := make_overlay_scroll(overlay, 38, 48, 38, 40)
+	var center := dialog_layout.get("center") as CenterContainer
 	var card := make_panel(Color("14293d"), 28, 2, Color("3c6978"))
 	card.custom_minimum_size.x = 620
 	center.add_child(card)
@@ -809,9 +824,9 @@ func show_new_life_dialog() -> void:
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.z_index = 100
 	add_child(overlay)
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(center)
+	var dialog_layout := make_overlay_scroll(overlay, 38, 48, 38, 40)
+	var dialog_scroll := dialog_layout.get("scroll") as ScrollContainer
+	var center := dialog_layout.get("center") as CenterContainer
 	var card := make_panel(Color("14293d"), 28, 2, Color("3c6978"))
 	card.custom_minimum_size = Vector2(610, 0)
 	center.add_child(card)
@@ -837,16 +852,23 @@ func show_new_life_dialog() -> void:
 	cancel.custom_minimum_size.y = 56
 	cancel.pressed.connect(close_overlay)
 	box.add_child(cancel)
+	box.add_child(make_keyboard_spacer(dialog_scroll, 0))
 
 
 func start_new_life(first_input: LineEdit, last_input: LineEdit) -> void:
 	simulation.new_life(first_input.text, last_input.text)
+	page_scroll_positions.clear()
 	close_overlay()
 	show_page("life")
 	show_toast("A new story has begun.", true)
 
 
 func close_overlay() -> void:
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	if is_instance_valid(focus_owner) and is_instance_valid(overlay) and overlay.is_ancestor_of(focus_owner):
+		focus_owner.release_focus()
+	DisplayServer.virtual_keyboard_hide()
+	clear_text_input_tracking()
 	if is_instance_valid(overlay):
 		overlay.queue_free()
 	overlay = null
@@ -868,20 +890,176 @@ func show_toast(message: String, success: bool = false) -> void:
 
 
 func make_scroll_page() -> VBoxContainer:
-	var scroll := ScrollContainer.new()
+	var scroll := make_mobile_scroll_container()
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	page_host.add_child(scroll)
+	active_page_scroll = scroll
 	var outer := MarginContainer.new()
 	outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	set_margins(outer, 0, 2, 5, 16)
 	scroll.add_child(outer)
+	var stack := VBoxContainer.new()
+	stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stack.add_theme_constant_override("separation", 0)
+	outer.add_child(stack)
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 13)
-	outer.add_child(content)
+	stack.add_child(content)
+	stack.add_child(make_keyboard_spacer(scroll, NORMAL_SCROLL_PADDING))
 	return content
+
+
+func make_mobile_scroll_container() -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.follow_focus = true
+	scroll.scroll_deadzone = 10
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	return scroll
+
+
+func make_overlay_scroll(parent: Control, left: int, top: int, right: int, bottom: int) -> Dictionary:
+	var outer_margin := MarginContainer.new()
+	outer_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	set_margins(outer_margin, left, top, right, bottom)
+	parent.add_child(outer_margin)
+	var scroll := make_mobile_scroll_container()
+	outer_margin.add_child(scroll)
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.mouse_filter = Control.MOUSE_FILTER_PASS
+	scroll.add_child(center)
+	return {"scroll": scroll, "center": center}
+
+
+func make_keyboard_spacer(scroll: ScrollContainer, normal_height: int) -> Control:
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = normal_height
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var scroll_id := scroll.get_instance_id()
+	scroll_spacers[scroll_id] = {"spacer": spacer, "normal_height": normal_height}
+	scroll.tree_exiting.connect(unregister_scroll_spacer.bind(scroll_id))
+	return spacer
+
+
+func unregister_scroll_spacer(scroll_id: int) -> void:
+	scroll_spacers.erase(scroll_id)
+
+
+func remember_page_scroll() -> void:
+	if is_instance_valid(active_page_scroll) and active_page_scroll.is_inside_tree():
+		page_scroll_positions[current_page] = active_page_scroll.scroll_vertical
+
+
+func restore_page_scroll(page_name: String) -> void:
+	if page_name != current_page or not is_instance_valid(active_page_scroll):
+		return
+	active_page_scroll.set_deferred("scroll_vertical", int(page_scroll_positions.get(page_name, 0)))
+
+
+func on_gui_focus_changed(control: Control) -> void:
+	if control is LineEdit or control is TextEdit:
+		focused_text_input = control
+		schedule_focused_control_reveal(control)
+	else:
+		clear_text_input_tracking()
+
+
+func on_text_input_focus_exited(input: Control) -> void:
+	if focused_text_input == input:
+		call_deferred("verify_text_input_focus")
+
+
+func verify_text_input_focus() -> void:
+	var owner := get_viewport().gui_get_focus_owner()
+	if not (owner is LineEdit or owner is TextEdit):
+		clear_text_input_tracking()
+
+
+func on_viewport_size_changed() -> void:
+	if is_instance_valid(focused_text_input):
+		schedule_focused_control_reveal(focused_text_input)
+
+
+func schedule_focused_control_reveal(control: Control) -> void:
+	if not is_instance_valid(control):
+		return
+	focus_reveal_serial += 1
+	var serial := focus_reveal_serial
+	call_deferred("reveal_focused_control", control, serial)
+	for delay in [0.12, 0.30, 0.55]:
+		get_tree().create_timer(float(delay)).timeout.connect(reveal_focused_control.bind(control, serial))
+
+
+func reveal_focused_control(control: Control, serial: int) -> void:
+	if serial != focus_reveal_serial or not is_instance_valid(control) or not control.has_focus():
+		return
+	var scroll := find_scroll_ancestor(control)
+	if scroll == null:
+		return
+	set_keyboard_spacer(scroll, keyboard_padding_in_viewport())
+	scroll.ensure_control_visible(control)
+	call_deferred("apply_keyboard_avoidance", control, scroll, serial)
+
+
+func apply_keyboard_avoidance(control: Control, scroll: ScrollContainer, serial: int) -> void:
+	if serial != focus_reveal_serial or not is_instance_valid(control) or not is_instance_valid(scroll) or not control.has_focus():
+		return
+	var keyboard_padding := keyboard_padding_in_viewport()
+	var scroll_rect := scroll.get_global_rect()
+	var control_rect := control.get_global_rect()
+	var viewport_bottom := get_viewport().get_visible_rect().end.y
+	var visible_bottom := minf(scroll_rect.end.y, viewport_bottom - float(keyboard_padding)) - INPUT_REVEAL_MARGIN
+	var visible_top := scroll_rect.position.y + INPUT_REVEAL_MARGIN
+	if control_rect.end.y > visible_bottom:
+		scroll.scroll_vertical += ceili(control_rect.end.y - visible_bottom)
+	elif control_rect.position.y < visible_top:
+		scroll.scroll_vertical -= ceili(visible_top - control_rect.position.y)
+
+
+func keyboard_padding_in_viewport() -> int:
+	var keyboard_pixels := DisplayServer.virtual_keyboard_get_height()
+	var screen_scale := absf(get_viewport().get_screen_transform().get_scale().y)
+	var measured_padding := 0
+	if keyboard_pixels > 0 and screen_scale > 0.001:
+		measured_padding = ceili(float(keyboard_pixels) / screen_scale) + INPUT_REVEAL_MARGIN
+	var requested_padding := maxi(KEYBOARD_FALLBACK_PADDING, measured_padding)
+	var viewport_cap := maxi(260, int(get_viewport().get_visible_rect().size.y * 0.62))
+	return mini(requested_padding, viewport_cap)
+
+
+func find_scroll_ancestor(control: Control) -> ScrollContainer:
+	var node: Node = control.get_parent()
+	while node != null:
+		if node is ScrollContainer:
+			return node as ScrollContainer
+		node = node.get_parent()
+	return null
+
+
+func set_keyboard_spacer(active_scroll: ScrollContainer, height: int) -> void:
+	for scroll_id in scroll_spacers.keys():
+		var entry: Dictionary = scroll_spacers.get(scroll_id, {})
+		var spacer := entry.get("spacer") as Control
+		if not is_instance_valid(spacer):
+			continue
+		var normal_height := int(entry.get("normal_height", 0))
+		spacer.custom_minimum_size.y = maxi(normal_height, height) if int(scroll_id) == active_scroll.get_instance_id() else normal_height
+
+
+func clear_text_input_tracking() -> void:
+	focus_reveal_serial += 1
+	focused_text_input = null
+	for scroll_id in scroll_spacers.keys():
+		var entry: Dictionary = scroll_spacers.get(scroll_id, {})
+		var spacer := entry.get("spacer") as Control
+		if is_instance_valid(spacer):
+			spacer.custom_minimum_size.y = int(entry.get("normal_height", 0))
 
 
 func make_page_intro(title_text: String, subtitle_text: String) -> Control:
@@ -940,6 +1118,7 @@ func make_divider() -> Control:
 
 func make_panel(color: Color, radius: int, border_width: int = 0, border_color: Color = Color.TRANSPARENT) -> PanelContainer:
 	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	panel.add_theme_stylebox_override("panel", make_style(color, radius, border_width, border_color))
 	return panel
 
@@ -963,6 +1142,7 @@ func make_style(color: Color, radius: int, border_width: int = 0, border_color: 
 
 func make_label(text_value: String, font_size: int, color: Color, weight: int = 500) -> Label:
 	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.text = text_value
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
@@ -974,6 +1154,7 @@ func make_label(text_value: String, font_size: int, color: Color, weight: int = 
 
 func make_button(text_value: String, style_name: String, font_size: int) -> Button:
 	var button := Button.new()
+	button.mouse_filter = Control.MOUSE_FILTER_PASS
 	button.text = text_value
 	button.add_theme_font_size_override("font_size", font_size)
 	button.add_theme_color_override("font_color", TEXT)
@@ -1008,14 +1189,19 @@ func make_button(text_value: String, style_name: String, font_size: int) -> Butt
 
 func make_line_edit(default_text: String, placeholder: String) -> LineEdit:
 	var input := LineEdit.new()
+	input.mouse_filter = Control.MOUSE_FILTER_PASS
 	input.text = default_text
 	input.placeholder_text = placeholder
+	input.clear_button_enabled = true
+	input.virtual_keyboard_enabled = true
+	input.virtual_keyboard_show_on_focus = true
 	input.custom_minimum_size.y = 58
 	input.add_theme_font_size_override("font_size", 16)
 	input.add_theme_color_override("font_color", TEXT)
 	input.add_theme_color_override("font_placeholder_color", MUTED)
 	input.add_theme_stylebox_override("normal", make_style(Color("0d1d2d"), 14, 1, LINE))
 	input.add_theme_stylebox_override("focus", make_style(Color("10283a"), 14, 2, TEAL))
+	input.focus_exited.connect(on_text_input_focus_exited.bind(input))
 	return input
 
 
@@ -1037,4 +1223,5 @@ func set_margins(container: MarginContainer, left: int, top: int, right: int, bo
 
 func clear_children(node: Node) -> void:
 	for child in node.get_children():
+		node.remove_child(child)
 		child.queue_free()

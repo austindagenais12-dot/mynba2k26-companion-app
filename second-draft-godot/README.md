@@ -12,6 +12,7 @@ This project is genre-inspired but contains no BitLife code, writing, artwork, b
 - Study, work, build relationships, purchase assets, and manage yearly income and expenses.
 - Search 5,120 careers across 40 real-world sectors, workplaces, and qualification levels.
 - Complete college, university, graduate, professional, doctoral, or medical study paths.
+- Drag to scroll every long screen, keep each tab's position, and automatically reveal text fields above the Android keyboard.
 - Your complete history is recorded in the Life timeline and saved locally.
 
 ## Development
