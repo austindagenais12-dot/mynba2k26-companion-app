@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-const VirtualJoystick = preload("res://scripts/virtual_joystick.gd")
+const VirtualJoystickScript = preload("res://scripts/virtual_joystick.gd")
 
 const NAVY := Color("#071B3E")
 const NAVY_ALPHA := Color(0.025, 0.08, 0.17, 0.92)
@@ -60,7 +60,7 @@ func build(profile: Dictionary) -> void:
 	var team_tag := _make_panel(root, "TeamTag", Color(0.025, 0.08, 0.17, 0.74), Vector2(34, 112), Vector2(330, 48), 12)
 	_make_label(team_tag, "LAKESHORE RAPTORS", Vector2.ZERO, team_tag.size, 22, HORIZONTAL_ALIGNMENT_CENTER, ICE)
 
-	var joystick := VirtualJoystick.new()
+	var joystick := VirtualJoystickScript.new()
 	joystick.name = "MoveJoystick"
 	joystick.position = Vector2(52, 744)
 	joystick.size = Vector2(286, 286)
@@ -230,4 +230,3 @@ func _style(color: Color, radius: int) -> StyleBoxFlat:
 	style.border_width_bottom = 2
 	style.border_color = Color(0.75, 0.92, 1.0, 0.16)
 	return style
-
