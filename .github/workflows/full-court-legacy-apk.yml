@@ -85,7 +85,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --editor --path full-court-legacy-godot --quit-after 4
+          godot --headless --path full-court-legacy-godot --import
           godot --headless --path full-court-legacy-godot --script res://tests/test_input.gd
           godot --headless --path full-court-legacy-godot --script res://tests/test_physics.gd
           godot --headless --path full-court-legacy-godot --script res://tests/test_animation_catalog.gd
