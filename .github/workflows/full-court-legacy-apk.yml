@@ -103,12 +103,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path full-court-legacy-godot --import
-          godot --headless --path full-court-legacy-godot --script res://tests/test_input.gd
-          godot --headless --path full-court-legacy-godot --script res://tests/test_physics.gd
-          godot --headless --path full-court-legacy-godot --script res://tests/test_animation_catalog.gd
-          godot --headless --path full-court-legacy-godot --script res://tests/test_anime_animation.gd
-          godot --headless --path full-court-legacy-godot --quit-after 30 2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
+          timeout --signal=KILL 120s godot --headless --path full-court-legacy-godot --import
+          timeout --signal=KILL 45s godot --headless --path full-court-legacy-godot --script res://tests/test_input.gd
+          timeout --signal=KILL 45s godot --headless --path full-court-legacy-godot --script res://tests/test_physics.gd
+          timeout --signal=KILL 45s godot --headless --path full-court-legacy-godot --script res://tests/test_animation_catalog.gd
+          timeout --signal=KILL 45s godot --headless --path full-court-legacy-godot --script res://tests/test_anime_animation.gd
+          timeout --signal=KILL 60s godot --headless --path full-court-legacy-godot --quit-after 30 2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
           if grep -E "ERROR:|SCRIPT ERROR|Parse Error|Invalid call|Invalid assignment" "$RUNNER_TEMP/godot-smoke.log"; then
             exit 1
           fi
