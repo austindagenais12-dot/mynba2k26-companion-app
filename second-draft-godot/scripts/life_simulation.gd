@@ -131,7 +131,7 @@ func perform_activity(activity_id: String) -> Dictionary:
 		if int(data.get("age", 0)) < int(activity.get("min_age", 0)):
 			return {"ok": false, "message": "This activity is not available at your age."}
 		var cost := int(activity.get("cost", 0))
-		if int(data.get("balance", 0)) < cost:
+		if cost > 0 and int(data.get("balance", 0)) < cost:
 			return {"ok": false, "message": "You do not have enough money for that."}
 		var effects: Dictionary = activity.get("effects", {}).duplicate(true)
 		if cost > 0:
