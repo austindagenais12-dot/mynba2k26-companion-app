@@ -1,7 +1,7 @@
 extends CanvasLayer
 
 const VirtualJoystickScript = preload("res://scripts/virtual_joystick.gd")
-const AUSTIN_PORTRAIT = preload("res://assets/ui/austin_career_portrait_v1_mobile.webp")
+const AUSTIN_PORTRAIT = preload("res://assets/ui/austin_anime_career_portrait_v2.webp")
 
 const NAVY := Color("#071B3E")
 const NAVY_ALPHA := Color(0.025, 0.08, 0.17, 0.92)

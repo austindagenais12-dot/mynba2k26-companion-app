@@ -2,7 +2,7 @@ extends Node3D
 
 const HUDScript = preload("res://scripts/hud.gd")
 const CareerStore = preload("res://scripts/career_store.gd")
-const PlayerModelScript = preload("res://scripts/player_model.gd")
+const PlayerModelScript = preload("res://scripts/anime_player_model.gd")
 const BasketballPhysicsScript = preload("res://scripts/basketball_physics.gd")
 const NetPhysicsScript = preload("res://scripts/net_physics.gd")
 const AnimationCatalog = preload("res://scripts/animation_catalog.gd")
@@ -108,7 +108,7 @@ func _exit_tree() -> void:
 		CareerStore.save_profile(profile)
 
 func _build_materials() -> void:
-	materials.court = _make_material(Color("#A86D3C"), 0.56)
+	materials.court = _make_court_material()
 	materials.navy = _make_material(NAVY, 0.42)
 	materials.blue = _make_material(LAKE_BLUE, 0.38)
 	materials.ice = _make_material(ICE, 0.32)
@@ -118,60 +118,81 @@ func _build_materials() -> void:
 	materials.line = _make_material(ICE, 0.75, 0.0, true)
 	materials.dark = _make_material(Color("#0B1018"), 0.62)
 	materials.green = _make_material(Color("#35FF6C"), 0.5, 0.0, true)
+	materials.concrete = _make_material(Color("#D8D7D0"), 0.9)
+	materials.acoustic = _make_material(Color("#AEB5BD"), 0.82)
+	materials.charcoal = _make_material(Color("#222B34"), 0.72, 0.08)
+	materials.bleacher = _make_material(Color("#17375C"), 0.66)
+	materials.rubber = _make_material(Color("#15243A"), 0.9)
+	materials.silver = _make_material(Color("#9AA7B2"), 0.34, 0.48)
+	materials.wood = _make_material(Color("#B9824B"), 0.46)
+	materials.red = _make_material(Color("#C62832"), 0.55)
+	materials.glass = _make_material(Color(0.45, 0.72, 0.88, 0.52), 0.12, 0.08)
+	materials.glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 func _build_environment() -> void:
 	var world_environment := WorldEnvironment.new()
 	world_environment.name = "GymEnvironment"
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("#030815")
+	environment.background_color = Color("#A9C5D6")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("#A8C4DD")
-	environment.ambient_light_energy = 0.62
+	environment.ambient_light_color = Color("#D7E4EC")
+	environment.ambient_light_energy = 0.48
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	world_environment.environment = environment
 	add_child(world_environment)
 
 	var key_light := DirectionalLight3D.new()
-	key_light.name = "GymKeyLight"
-	key_light.light_color = Color("#EFF8FF")
-	key_light.light_energy = 1.2
+	key_light.name = "ClerestoryDaylight"
+	key_light.light_color = Color("#F4FAFF")
+	key_light.light_energy = 0.92
 	key_light.shadow_enabled = true
-	key_light.rotation_degrees = Vector3(-48.0, -28.0, 0.0)
+	key_light.rotation_degrees = Vector3(-52.0, -31.0, 0.0)
 	add_child(key_light)
 
-	for index in range(-1, 2):
-		var fill := OmniLight3D.new()
-		fill.name = "CeilingFill%d" % index
-		fill.position = Vector3(index * 5.0, 7.0, 0.0)
-		fill.omni_range = 15.0
-		fill.light_energy = 4.2
-		fill.light_color = Color("#BFE6FF")
-		fill.shadow_enabled = false
-		add_child(fill)
-
 	var gym := Node3D.new()
-	gym.name = "LakeshoreOpenGym"
+	gym.name = "LakeshoreRealLifeGym"
 	add_child(gym)
 
+	# Layered floor assembly: dark resilient apron around a polished maple court.
+	_make_box(gym, "GymFloorSlab", Vector3(0.0, -0.21, 0.0), Vector3(17.2, 0.22, 29.2), materials.charcoal, true)
 	_make_box(gym, "Court", Vector3(0.0, -0.08, 0.0), Vector3(15.2, 0.16, 28.4), materials.court, true)
-	_make_box(gym, "NorthPadding", Vector3(0.0, 1.1, 14.25), Vector3(15.8, 2.2, 0.25), materials.navy, true)
-	_make_box(gym, "SouthPadding", Vector3(0.0, 1.1, -14.25), Vector3(15.8, 2.2, 0.25), materials.navy, true)
-	_make_box(gym, "WestWall", Vector3(-8.1, 2.4, 0.0), Vector3(0.24, 4.8, 29.0), materials.steel, true)
-	_make_box(gym, "EastWall", Vector3(8.1, 2.4, 0.0), Vector3(0.24, 4.8, 29.0), materials.steel, true)
-	_make_box(gym, "NorthAccent", Vector3(0.0, 2.35, 14.08), Vector3(8.5, 0.18, 0.08), materials.blue, false)
-	_make_box(gym, "SouthAccent", Vector3(0.0, 2.35, -14.08), Vector3(8.5, 0.18, 0.08), materials.blue, false)
+	_make_box(gym, "WestCourtApron", Vector3(-7.9, -0.075, 0.0), Vector3(0.65, 0.15, 28.4), materials.navy, false)
+	_make_box(gym, "EastCourtApron", Vector3(7.9, -0.075, 0.0), Vector3(0.65, 0.15, 28.4), materials.navy, false)
 
-	for index in range(4):
-		var y := 0.35 + index * 0.42
-		var x := 7.45 + index * 0.18
-		_make_box(gym, "EastBleacher%d" % index, Vector3(x, y, 0.0), Vector3(0.75, 0.22, 19.0), materials.navy, false)
-		_make_box(gym, "WestBleacher%d" % index, Vector3(-x, y, 0.0), Vector3(0.75, 0.22, 19.0), materials.blue, false)
+	# Full-height masonry shell with acoustic upper panels and structural columns.
+	_make_box(gym, "NorthCinderblockWall", Vector3(0.0, 2.45, 14.55), Vector3(17.4, 4.9, 0.3), materials.concrete, true)
+	_make_box(gym, "SouthCinderblockWall", Vector3(0.0, 2.45, -14.55), Vector3(17.4, 4.9, 0.3), materials.concrete, true)
+	_make_box(gym, "WestCinderblockWall", Vector3(-8.55, 2.45, 0.0), Vector3(0.3, 4.9, 29.4), materials.concrete, true)
+	_make_box(gym, "EastCinderblockWall", Vector3(8.55, 2.45, 0.0), Vector3(0.3, 4.9, 29.4), materials.concrete, true)
+	_make_box(gym, "NorthAcousticWall", Vector3(0.0, 6.45, 14.55), Vector3(17.4, 3.1, 0.3), materials.acoustic, false)
+	_make_box(gym, "SouthAcousticWall", Vector3(0.0, 6.45, -14.55), Vector3(17.4, 3.1, 0.3), materials.acoustic, false)
+	_make_box(gym, "WestAcousticWall", Vector3(-8.55, 6.45, 0.0), Vector3(0.3, 3.1, 29.4), materials.acoustic, false)
+	_make_box(gym, "EastAcousticWall", Vector3(8.55, 6.45, 0.0), Vector3(0.3, 3.1, 29.4), materials.acoustic, false)
+	_make_box(gym, "InsulatedRoof", Vector3(0.0, 8.5, 0.0), Vector3(17.4, 0.18, 29.4), materials.charcoal, false)
 
-	for z in [-9.5, -3.2, 3.2, 9.5]:
-		_make_box(gym, "CeilingBeam", Vector3(0.0, 6.8, z), Vector3(16.2, 0.15, 0.18), materials.steel, false)
-		for x in [-5.2, 0.0, 5.2]:
-			_make_box(gym, "LightPanel", Vector3(x, 6.68, z), Vector3(2.2, 0.05, 0.42), materials.ice, false)
+	for x in [-8.15, -5.45, -2.72, 0.0, 2.72, 5.45, 8.15]:
+		_make_box(gym, "NorthWallColumn", Vector3(x, 4.25, 14.36), Vector3(0.16, 8.2, 0.18), materials.silver, false)
+		_make_box(gym, "SouthWallColumn", Vector3(x, 4.25, -14.36), Vector3(0.16, 8.2, 0.18), materials.silver, false)
+	for z in [-13.7, -9.15, -4.58, 0.0, 4.58, 9.15, 13.7]:
+		_make_box(gym, "WestWallColumn", Vector3(-8.36, 4.25, z), Vector3(0.18, 8.2, 0.16), materials.silver, false)
+		_make_box(gym, "EastWallColumn", Vector3(8.36, 4.25, z), Vector3(0.18, 8.2, 0.16), materials.silver, false)
+
+	# Safety padding is broken into realistic upholstered panels.
+	for panel_index in range(11):
+		var panel_x := -7.35 + panel_index * 1.47
+		_make_box(gym, "NorthSafetyPad%d" % panel_index, Vector3(panel_x, 1.18, 14.33), Vector3(1.39, 2.18, 0.18), materials.rubber, false)
+		_make_box(gym, "SouthSafetyPad%d" % panel_index, Vector3(panel_x, 1.18, -14.33), Vector3(1.39, 2.18, 0.18), materials.rubber, false)
+	_make_box(gym, "NorthLakeBlueRail", Vector3(0.0, 2.35, 14.2), Vector3(16.4, 0.12, 0.09), materials.blue, false)
+	_make_box(gym, "SouthLakeBlueRail", Vector3(0.0, 2.35, -14.2), Vector3(16.4, 0.12, 0.09), materials.blue, false)
+
+	_build_real_bleachers(gym)
+	_build_gym_windows(gym)
+	_build_gym_doors(gym)
+	_build_ceiling_structure(gym)
+	_build_scoreboard_and_banners(gym)
+	_build_gym_furniture(gym)
+	_build_lakeshore_wall_branding(gym)
 
 	var line_y := 0.012
 	_make_polyline(gym, [
@@ -185,22 +206,179 @@ func _build_environment() -> void:
 	_build_three_point_line(gym, line_y, 1.0)
 	_build_three_point_line(gym, line_y, -1.0)
 
-	var logo_outer := _make_box(gym, "CentreLogoPlate", Vector3(0.0, 0.002, 0.0), Vector3(3.1, 0.025, 3.1), materials.navy, false)
-	logo_outer.rotation.y = deg_to_rad(45.0)
-	var logo_inner := _make_box(gym, "CentreLogoInset", Vector3(0.0, 0.02, 0.0), Vector3(2.15, 0.018, 2.15), materials.blue, false)
-	logo_inner.rotation.y = deg_to_rad(45.0)
-	_make_box(gym, "CentreMark", Vector3(0.0, 0.035, 0.0), Vector3(0.38, 0.02, 2.0), materials.ice, false).rotation.y = deg_to_rad(45.0)
+	_make_floor_disc(gym, "CentreLogoOuter", Vector3(0.0, 0.026, 0.0), 1.58, materials.navy)
+	_make_floor_disc(gym, "CentreLogoLake", Vector3(0.0, 0.039, 0.0), 1.32, materials.blue)
+	_make_floor_disc(gym, "CentreLogoIce", Vector3(0.0, 0.052, 0.0), 0.98, materials.ice)
+	_make_polyline(gym, [Vector3(-0.82, 0.068, 0.35), Vector3(-0.25, 0.068, -0.48), Vector3(0.08, 0.068, -0.04), Vector3(0.43, 0.068, -0.62), Vector3(0.88, 0.068, 0.35)], 0.1, materials.navy, false)
+	_make_polyline(gym, [Vector3(-0.66, 0.072, 0.55), Vector3(0.0, 0.072, 0.18), Vector3(0.72, 0.072, 0.54)], 0.08, materials.blue, false)
 
-	var gym_label := Label3D.new()
-	gym_label.name = "LakeshoreWordmark"
-	gym_label.text = "LAKESHORE RAPTORS  •  OPEN GYM"
-	gym_label.font_size = 74
-	gym_label.pixel_size = 0.006
-	gym_label.outline_size = 12
-	gym_label.modulate = ICE
-	gym_label.position = Vector3(0.0, 4.65, 13.95)
-	gym_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	add_child(gym_label)
+	var west_wordmark := _make_label_3d(gym, "WestSidelineWordmark", "LAKESHORE RAPTORS", Vector3(-7.05, 0.035, 0.0), 62, 0.0046, ICE, false)
+	west_wordmark.rotation_degrees = Vector3(-90.0, 0.0, -90.0)
+	var east_wordmark := _make_label_3d(gym, "EastSidelineWordmark", "LAKESHORE RAPTORS", Vector3(7.05, 0.035, 0.0), 62, 0.0046, ICE, false)
+	east_wordmark.rotation_degrees = Vector3(-90.0, 0.0, 90.0)
+
+
+func _build_real_bleachers(gym: Node3D) -> void:
+	for side in [-1.0, 1.0]:
+		var side_name := "West" if side < 0.0 else "East"
+		for row in range(6):
+			var x := side * (7.28 + row * 0.18)
+			var y := 0.24 + row * 0.29
+			for section in [-1.0, 1.0]:
+				var z := section * 5.2
+				_make_box(gym, "%sBleacherSeat%d" % [side_name, row], Vector3(x, y, z), Vector3(0.52, 0.12, 8.55), materials.bleacher, false)
+				_make_box(gym, "%sBleacherRiser%d" % [side_name, row], Vector3(x + side * 0.19, y - 0.14, z), Vector3(0.1, 0.3, 8.55), materials.charcoal, false)
+			var step_material: Material = materials.concrete if row % 2 == 0 else materials.acoustic
+			_make_box(gym, "%sAisleStep%d" % [side_name, row], Vector3(x, y - 0.03, 0.0), Vector3(0.56, 0.18, 1.45), step_material, false)
+		for rail_z in [-1.0, 1.0]:
+			_make_cylinder_between(gym, "%sAisleRail" % side_name, Vector3(side * 7.15, 0.35, rail_z), Vector3(side * 8.22, 2.02, rail_z), 0.035, materials.silver, false)
+			_make_cylinder_between(gym, "%sAislePost" % side_name, Vector3(side * 7.3, 0.2, rail_z), Vector3(side * 7.3, 0.95, rail_z), 0.032, materials.silver, false)
+			_make_cylinder_between(gym, "%sAislePost" % side_name, Vector3(side * 8.15, 1.55, rail_z), Vector3(side * 8.15, 2.25, rail_z), 0.032, materials.silver, false)
+
+
+func _build_gym_windows(gym: Node3D) -> void:
+	for side in [-1.0, 1.0]:
+		var side_name := "West" if side < 0.0 else "East"
+		for index in range(6):
+			var z := -11.4 + index * 4.56
+			_make_box(gym, "%sClerestoryGlass%d" % [side_name, index], Vector3(side * 8.35, 6.6, z), Vector3(0.08, 1.28, 2.75), materials.glass, false)
+			_make_box(gym, "%sWindowTopFrame%d" % [side_name, index], Vector3(side * 8.3, 7.26, z), Vector3(0.12, 0.09, 2.86), materials.charcoal, false)
+			_make_box(gym, "%sWindowBottomFrame%d" % [side_name, index], Vector3(side * 8.3, 5.94, z), Vector3(0.12, 0.09, 2.86), materials.charcoal, false)
+			_make_box(gym, "%sWindowMullion%d" % [side_name, index], Vector3(side * 8.29, 6.6, z), Vector3(0.13, 1.28, 0.075), materials.charcoal, false)
+
+
+func _build_gym_doors(gym: Node3D) -> void:
+	for wall_side in [-1.0, 1.0]:
+		var z := wall_side * 14.32
+		var wall_name := "South" if wall_side < 0.0 else "North"
+		for doorway_side in [-1.0, 1.0]:
+			var doorway_x := doorway_side * 5.9
+			for leaf in [-1.0, 1.0]:
+				var x := doorway_x + leaf * 0.55
+				_make_box(gym, "%sDoubleDoor" % wall_name, Vector3(x, 1.18, z), Vector3(1.02, 2.28, 0.12), materials.charcoal, false)
+				_make_box(gym, "%sDoorVisionGlass" % wall_name, Vector3(x, 1.56, z - wall_side * 0.07), Vector3(0.23, 0.62, 0.025), materials.glass, false)
+				_make_box(gym, "%sDoorPushBar" % wall_name, Vector3(x, 0.93, z - wall_side * 0.09), Vector3(0.68, 0.045, 0.04), materials.silver, false)
+			_make_box(gym, "%sDoorHeader" % wall_name, Vector3(doorway_x, 2.4, z), Vector3(2.3, 0.12, 0.16), materials.silver, false)
+			var exit_label := _make_label_3d(gym, "%sExitLabel" % wall_name, "EXIT", Vector3(doorway_x, 2.61, z - wall_side * 0.1), 28, 0.0026, Color("#65FF94"), true)
+			exit_label.outline_size = 5
+
+
+func _build_ceiling_structure(gym: Node3D) -> void:
+	for z in [-11.0, -5.5, 0.0, 5.5, 11.0]:
+		_make_cylinder_between(gym, "RoofTrussBottom", Vector3(-8.25, 7.25, z), Vector3(8.25, 7.25, z), 0.055, materials.charcoal, false)
+		_make_cylinder_between(gym, "RoofTrussLeftPitch", Vector3(-8.25, 7.25, z), Vector3(0.0, 8.34, z), 0.055, materials.charcoal, false)
+		_make_cylinder_between(gym, "RoofTrussRightPitch", Vector3(0.0, 8.34, z), Vector3(8.25, 7.25, z), 0.055, materials.charcoal, false)
+		for segment in range(4):
+			var x0 := -8.0 + segment * 4.0
+			var x1 := x0 + 4.0
+			var apex_y := 8.28 - absf((x0 + x1) * 0.5) * 0.13
+			_make_cylinder_between(gym, "RoofTrussWeb", Vector3(x0, 7.25, z), Vector3(x1, apex_y, z), 0.034, materials.charcoal, false)
+	for duct_x in [-4.85, 4.85]:
+		_make_cylinder_between(gym, "SilverHVACDuct", Vector3(duct_x, 7.72, -13.6), Vector3(duct_x, 7.72, 13.6), 0.2, materials.silver, false)
+	for z in [-9.0, -3.0, 3.0, 9.0]:
+		for x in [-5.0, 0.0, 5.0]:
+			_make_box(gym, "SuspendedLEDPanel", Vector3(x, 7.03, z), Vector3(2.15, 0.08, 0.48), materials.ice, false)
+	for light_index in range(6):
+		var fill := OmniLight3D.new()
+		fill.name = "LEDGymFill%d" % light_index
+		fill.position = Vector3(-3.8 if light_index % 2 == 0 else 3.8, 6.85, -9.0 + float(light_index / 2) * 9.0)
+		fill.omni_range = 11.5
+		fill.light_energy = 2.15
+		fill.light_color = Color("#E8F5FF")
+		fill.shadow_enabled = false
+		gym.add_child(fill)
+
+
+func _build_scoreboard_and_banners(gym: Node3D) -> void:
+	_make_box(gym, "ScoreboardBlueFrame", Vector3(0.0, 5.8, 14.29), Vector3(4.6, 2.05, 0.16), materials.blue, false)
+	_make_box(gym, "DigitalScoreboard", Vector3(0.0, 5.8, 14.18), Vector3(4.32, 1.78, 0.1), materials.dark, false)
+	_make_label_3d(gym, "ScoreboardTitle", "LAKESHORE RAPTORS", Vector3(0.0, 6.43, 14.08), 44, 0.0032, ICE, true)
+	_make_label_3d(gym, "ScoreboardReadout", "HOME  00     2:00     GUEST  00", Vector3(0.0, 5.83, 14.07), 42, 0.0028, Color("#FFB12B"), true)
+	_make_label_3d(gym, "ScoreboardDetails", "PERIOD 1      FOULS 0      FOULS 0", Vector3(0.0, 5.34, 14.07), 28, 0.0024, Color("#F2F6F8"), true)
+	_make_box(gym, "ShotClockHousing", Vector3(0.0, 4.55, 14.2), Vector3(1.05, 0.68, 0.12), materials.dark, false)
+	_make_label_3d(gym, "ShotClockDigits", "24", Vector3(0.0, 4.56, 14.08), 58, 0.004, Color("#FF5038"), true)
+
+	var banner_years := ["2018", "2020", "2022", "2024"]
+	for index in range(banner_years.size()):
+		var x := -6.5 + index * 4.35
+		_make_box(gym, "ChampionshipBanner%d" % index, Vector3(x, 5.85, -14.28), Vector3(1.7, 2.25, 0.08), materials.navy if index % 2 == 0 else materials.blue, false)
+		_make_label_3d(gym, "BannerText%d" % index, "RAPTORS\nCHAMPIONS\n%s" % banner_years[index], Vector3(x, 5.9, -14.18), 31, 0.0028, ICE, true)
+
+	# Stylized but recognizable Canadian flag between the championship banners.
+	_make_box(gym, "CanadaFlagWhite", Vector3(0.0, 7.23, -14.27), Vector3(2.55, 1.15, 0.06), materials.ice, false)
+	_make_box(gym, "CanadaFlagLeftRed", Vector3(-1.02, 7.23, -14.2), Vector3(0.52, 1.15, 0.035), materials.red, false)
+	_make_box(gym, "CanadaFlagRightRed", Vector3(1.02, 7.23, -14.2), Vector3(0.52, 1.15, 0.035), materials.red, false)
+	_make_label_3d(gym, "CanadaMapleLeaf", "◆", Vector3(0.0, 7.2, -14.16), 72, 0.005, Color("#C62832"), true)
+
+
+func _build_gym_furniture(gym: Node3D) -> void:
+	_make_box(gym, "ScorersTable", Vector3(-6.78, 0.46, 0.0), Vector3(0.42, 0.86, 3.55), materials.navy, false)
+	_make_box(gym, "ScorersTableTop", Vector3(-6.75, 0.91, 0.0), Vector3(0.62, 0.08, 3.7), materials.wood, false)
+	var table_label := _make_label_3d(gym, "ScorersTableBrand", "LAKESHORE\nRAPTORS", Vector3(-6.54, 0.47, 0.0), 34, 0.003, ICE, true)
+	table_label.rotation.y = PI * 0.5
+	for bench_side in [-1.0, 1.0]:
+		for seat_index in range(5):
+			var z := bench_side * (4.4 + seat_index * 0.72)
+			_make_box(gym, "TeamBenchSeat", Vector3(-6.72, 0.46, z), Vector3(0.42, 0.08, 0.62), materials.bleacher, false)
+			_make_cylinder_between(gym, "TeamBenchLeg", Vector3(-6.82, 0.08, z - 0.22), Vector3(-6.82, 0.43, z - 0.22), 0.025, materials.silver, false)
+			_make_cylinder_between(gym, "TeamBenchLeg", Vector3(-6.82, 0.08, z + 0.22), Vector3(-6.82, 0.43, z + 0.22), 0.025, materials.silver, false)
+	# Ball rack and six spare balls beside the home bench.
+	_make_cylinder_between(gym, "BallRackBottom", Vector3(6.72, 0.2, -8.2), Vector3(6.72, 0.2, -5.8), 0.035, materials.silver, false)
+	_make_cylinder_between(gym, "BallRackTop", Vector3(6.72, 0.72, -8.2), Vector3(6.72, 0.72, -5.8), 0.035, materials.silver, false)
+	for ball_index in range(6):
+		var spare_ball := MeshInstance3D.new()
+		spare_ball.name = "SpareBasketball%d" % ball_index
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.115
+		sphere.height = 0.23
+		sphere.radial_segments = 16
+		sphere.rings = 8
+		spare_ball.mesh = sphere
+		spare_ball.material_override = materials.orange
+		spare_ball.position = Vector3(6.72, 0.36 if ball_index < 3 else 0.86, -7.85 + (ball_index % 3) * 0.7)
+		gym.add_child(spare_ball)
+
+
+func _build_lakeshore_wall_branding(gym: Node3D) -> void:
+	_make_label_3d(gym, "NorthGymWordmark", "LAKESHORE RAPTORS", Vector3(0.0, 3.48, 14.12), 66, 0.0045, ICE, true)
+	_make_label_3d(gym, "SouthGymSlogan", "BUILT BY THE LAKE, DRIVEN BY THE CLIMB", Vector3(0.0, 3.5, -14.12), 52, 0.0037, Color("#0A2342"), true)
+	var mountain_points := [
+		Vector3(-5.2, 2.74, 14.1), Vector3(-3.6, 3.75, 14.1), Vector3(-2.6, 3.04, 14.1),
+		Vector3(-1.15, 4.15, 14.1), Vector3(0.0, 3.22, 14.1), Vector3(1.3, 4.02, 14.1),
+		Vector3(2.45, 3.12, 14.1), Vector3(3.7, 3.82, 14.1), Vector3(5.2, 2.74, 14.1)
+	]
+	for index in range(mountain_points.size() - 1):
+		_make_cylinder_between(gym, "MountainWallMural", mountain_points[index], mountain_points[index + 1], 0.045, materials.blue, false)
+
+
+func _make_label_3d(parent: Node3D, label_name: String, text_value: String, local_position: Vector3, font_size: int, pixel_size: float, color: Color, billboard_enabled: bool) -> Label3D:
+	var label := Label3D.new()
+	label.name = label_name
+	label.text = text_value
+	label.font_size = font_size
+	label.pixel_size = pixel_size
+	label.outline_size = 9
+	label.modulate = color
+	label.position = local_position
+	if billboard_enabled:
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	parent.add_child(label)
+	return label
+
+
+func _make_floor_disc(parent: Node3D, object_name: String, local_position: Vector3, radius: float, material: Material) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	instance.name = object_name
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = 0.018
+	mesh.radial_segments = 64
+	instance.mesh = mesh
+	instance.material_override = material
+	instance.position = local_position
+	parent.add_child(instance)
+	return instance
 
 func _build_key_lines(parent: Node3D, y: float, direction: float) -> void:
 	var baseline := direction * 13.6
@@ -756,6 +934,43 @@ func _make_material(color: Color, roughness: float, metallic := 0.0, unshaded :=
 	material.metallic = metallic
 	if unshaded:
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return material
+
+
+func _make_court_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode diffuse_burley, specular_schlick_ggx;
+
+uniform vec3 maple_light : source_color = vec3(0.76, 0.48, 0.25);
+uniform vec3 maple_dark : source_color = vec3(0.48, 0.25, 0.12);
+uniform vec3 seam_color : source_color = vec3(0.22, 0.12, 0.07);
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 345.45));
+	p += dot(p, p + 34.345);
+	return fract(p.x * p.y);
+}
+
+void fragment() {
+	vec2 plank_uv = UV * vec2(46.0, 18.0);
+	float plank_id = floor(plank_uv.x) + floor(plank_uv.y) * 47.0;
+	float variation = hash21(vec2(plank_id, floor(plank_uv.y)));
+	float long_grain = sin(UV.y * 780.0 + variation * 19.0) * 0.5 + 0.5;
+	long_grain += sin(UV.y * 1710.0 + UV.x * 21.0) * 0.18;
+	float board_seam = smoothstep(0.465, 0.5, abs(fract(plank_uv.x) - 0.5));
+	float end_seam = smoothstep(0.478, 0.5, abs(fract(plank_uv.y + variation * 0.5) - 0.5));
+	vec3 wood = mix(maple_dark, maple_light, 0.52 + variation * 0.24 + long_grain * 0.1);
+	wood = mix(wood, seam_color, max(board_seam, end_seam) * 0.74);
+	ALBEDO = wood;
+	ROUGHNESS = 0.27 + variation * 0.08;
+	SPECULAR = 0.58;
+	METALLIC = 0.0;
+}
+"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
 	return material
 
 func _make_box(parent: Node3D, object_name: String, position: Vector3, size: Vector3, material: Material, collision_enabled: bool) -> MeshInstance3D:

@@ -1,4 +1,4 @@
-# Full Court Legacy — Godot Android prototype v0.3
+# Full Court Legacy — Godot Android prototype v0.4
 
 An original, Android-first player-lock basketball career prototype built with Godot 4.7.2. You control one created player at all times in a fictional Lakeshore Raptors open gym.
 
@@ -6,11 +6,13 @@ An original, Android-first player-lock basketball career prototype built with Go
 
 - Third-person player-lock movement and camera
 - Corrected four-direction mobile joystick with diagonal movement
-- Austin-inspired articulated player model with swept dark hair, thick brows, full beard, moustache, and broader athletic proportions
-- Photoreal Austin turnaround and transparent in-game career portrait based on the supplied front/profile photos
-- PBR skin, eye, hair, beard, shoe, and basketball material pass
-- Procedural idle, walk, sprint, dribble-hand, crossover, defensive-shuffle, shot-gather, jump, release, and follow-through animations
-- Motion Studio with 2,304 saved signature combinations spanning locomotion, release, handle, and tempo styles
+- Smooth Austin-inspired sports-anime player with swept dark hair, expressive eyes, thick brows, full beard, moustache, and broader athletic proportions
+- Original production turnaround based on the supplied front/profile photos, with a matching Lakeshore Raptors No. 7 uniform
+- Rounded capsule, sphere, and tapered-mesh anatomy and clothing—no block-shaped player body parts
+- Mobile-efficient toon skin, eye, hair, beard, uniform, and shoe materials with ink-like silhouette outlines
+- Eleven real `AnimationPlayer` clips: idle, walk, sprint, left/right dribble, left/right crossover, shot gather, shot release/follow-through, defensive stance, and defensive shuffle
+- Cubic-angle keyframe interpolation and custom transition blending instead of direct per-frame pose twitching
+- Motion Studio with 2,304 saved signature combinations that rebuild authored curve amplitude and playback timing across locomotion, release, handle, and tempo styles
 - Mobile joystick plus sprint, crossover, shoot, and reset-ball controls
 - Keyboard equivalents for desktop testing
 - Hold/release shot timing with early, late, good, and green feedback
@@ -22,7 +24,9 @@ An original, Android-first player-lock basketball career prototype built with Go
 - Physical rebounds, loose-ball recovery, and downward scoring trigger
 - Two-minute repeatable open-gym sessions
 - Persistent career XP, points, attempts, makes, and sessions in `user://full_court_legacy_career.json`
-- Fully procedural court, gym, players, hoop, HUD, and original fictional identity
+- Rebuilt real-world Lakeshore gym with polished maple grain, cinderblock/acoustic walls, safety padding, six-row retractable bleachers, clerestory windows, double exits, trusses, HVAC, LED fixtures, scorer table, benches, and ball rack
+- Original scoreboard, shot clock, championship banners, Canadian flag, mountain mural, court wordmarks, and Lakeshore Raptors identity
+- Fully original court, gym, players, hoop, HUD, and fictional identity
 
 ## Controls
 
@@ -39,7 +43,7 @@ An original, Android-first player-lock basketball career prototype built with Go
 
 Open this folder as a Godot 4.7.2 project and press **F6/F5**. The project uses GDScript and the GL Compatibility renderer, so it does not require .NET or proprietary third-party assets.
 
-The procedural rig remains the Android fallback while the final skinned GLB is authored. `assets/models/README.md` defines the production model/LOD/PBR contract, and `assets/animations/README.md` defines the scalable motion-capture import pipeline.
+The included anime character is a complete in-engine articulated rig designed for mobile and backed by authored Godot animation resources. It is not yet a hand-sculpted and skinned Blender GLB; `assets/models/README.md` defines that later production model/LOD contract, and `assets/animations/README.md` defines the scalable motion-capture import pipeline.
 
 ## Android package
 
