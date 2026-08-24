@@ -22,6 +22,20 @@ var _action_duration := 0.0
 var _action_side := 1
 var _is_defender := false
 
+var _cadence_scale := 1.0
+var _stride_scale := 1.0
+var _bob_scale := 1.0
+var _arm_swing_scale := 1.0
+var _release_height := 1.0
+var _release_speed := 1.0
+var _jump_scale := 1.0
+var _follow_through := 1.0
+var _dribble_reach := 1.0
+var _crossover_lean := 1.0
+var _handle_speed := 1.0
+var _pose_response := 1.0
+var _stance_scale := 1.0
+
 var _skin_material: StandardMaterial3D
 var _hair_material: StandardMaterial3D
 var _beard_material: StandardMaterial3D
@@ -43,6 +57,7 @@ func build(jersey_material: Material, trim_material: Material, career_player: bo
 	_lip_material = _material(Color("#985F62"), 0.58)
 	_shoe_material = _material(Color("#E8F5FA"), 0.4)
 	_sole_material = _material(Color("#101820"), 0.72)
+	_configure_pbr_materials()
 
 	_visual_root = Node3D.new()
 	_visual_root.name = "AnimatedVisualRig"
@@ -52,25 +67,40 @@ func build(jersey_material: Material, trim_material: Material, career_player: bo
 	_build_arms(jersey_material)
 	_build_legs(trim_material)
 
+func set_animation_profile(profile: Dictionary) -> void:
+	_cadence_scale = float(profile.get("cadence_scale", 1.0))
+	_stride_scale = float(profile.get("stride_scale", 1.0))
+	_bob_scale = float(profile.get("bob_scale", 1.0))
+	_arm_swing_scale = float(profile.get("arm_swing_scale", 1.0))
+	_release_height = float(profile.get("release_height", 1.0))
+	_release_speed = float(profile.get("release_speed", 1.0))
+	_jump_scale = float(profile.get("jump_scale", 1.0))
+	_follow_through = float(profile.get("follow_through", 1.0))
+	_dribble_reach = float(profile.get("dribble_reach", 1.0))
+	_crossover_lean = float(profile.get("crossover_lean", 1.0))
+	_handle_speed = float(profile.get("handle_speed", 1.0))
+	_pose_response = float(profile.get("pose_response", 1.0))
+	_stance_scale = float(profile.get("stance_scale", 1.0))
+
 func update_player_animation(delta: float, movement_amount: float, sprinting: bool, has_ball: bool, charging: bool, shot_progress: float, dribble_side: int) -> void:
 	if _visual_root == null:
 		return
 	_advance_action(delta)
 	var target_blend := clampf(movement_amount, 0.0, 1.0)
 	_motion_blend = lerpf(_motion_blend, target_blend, 1.0 - exp(-delta * 9.0))
-	var cadence := lerpf(2.2, 9.5 if sprinting else 6.2, _motion_blend)
+	var cadence := lerpf(2.2, 9.5 if sprinting else 6.2, _motion_blend) * _cadence_scale
 	_phase += delta * cadence
-	var stride_scale := (0.72 if sprinting else 0.48) * _motion_blend
-	var stride := sin(_phase) * stride_scale
-	var bob := absf(sin(_phase * 2.0)) * (0.035 if sprinting else 0.022) * _motion_blend
+	var stride_amount := (0.72 if sprinting else 0.48) * _motion_blend * _stride_scale
+	var stride := sin(_phase) * stride_amount
+	var bob := absf(sin(_phase * 2.0)) * (0.035 if sprinting else 0.022) * _motion_blend * _bob_scale
 	var breathing := sin(Time.get_ticks_msec() / 1000.0 * 2.1) * 0.008
 
 	var left_hip_target := Vector3(stride, 0.0, 0.0)
 	var right_hip_target := Vector3(-stride, 0.0, 0.0)
 	var left_knee_target := Vector3(maxf(0.0, -stride) * 0.62, 0.0, 0.0)
 	var right_knee_target := Vector3(maxf(0.0, stride) * 0.62, 0.0, 0.0)
-	var left_shoulder_target := Vector3(-stride * 0.72, 0.0, -0.08)
-	var right_shoulder_target := Vector3(stride * 0.72, 0.0, 0.08)
+	var left_shoulder_target := Vector3(-stride * 0.72 * _arm_swing_scale, 0.0, -0.08)
+	var right_shoulder_target := Vector3(stride * 0.72 * _arm_swing_scale, 0.0, 0.08)
 	var left_elbow_target := Vector3(0.16 + absf(stride) * 0.18, 0.0, 0.0)
 	var right_elbow_target := Vector3(0.16 + absf(stride) * 0.18, 0.0, 0.0)
 	var torso_target := Vector3(0.0, sin(_phase) * 0.055 * _motion_blend, sin(_phase) * 0.018 * _motion_blend)
@@ -78,7 +108,7 @@ func update_player_animation(delta: float, movement_amount: float, sprinting: bo
 	var root_offset := Vector3(0.0, bob + breathing, 0.0)
 
 	if has_ball and not charging:
-		var ball_arm := 0.48 + absf(sin(_phase * 1.35)) * 0.16
+		var ball_arm := (0.48 + absf(sin(_phase * 1.35 * _handle_speed)) * 0.16) * _dribble_reach
 		if dribble_side > 0:
 			right_shoulder_target.x = ball_arm
 			right_shoulder_target.z = 0.14
@@ -106,9 +136,9 @@ func update_player_animation(delta: float, movement_amount: float, sprinting: bo
 	if _action == "crossover":
 		var progress := clampf(_action_time / maxf(_action_duration, 0.001), 0.0, 1.0)
 		var pulse := sin(progress * PI)
-		root_offset.x = -_action_side * pulse * 0.1
-		torso_target.z = -_action_side * pulse * 0.2
-		torso_target.y = _action_side * pulse * 0.16
+		root_offset.x = -_action_side * pulse * 0.1 * _crossover_lean
+		torso_target.z = -_action_side * pulse * 0.2 * _crossover_lean
+		torso_target.y = _action_side * pulse * 0.16 * _crossover_lean
 		left_hip_target.x += pulse * 0.24
 		right_hip_target.x += pulse * 0.24
 		if _action_side > 0:
@@ -120,11 +150,11 @@ func update_player_animation(delta: float, movement_amount: float, sprinting: bo
 	elif _action == "shot":
 		var progress := clampf(_action_time / maxf(_action_duration, 0.001), 0.0, 1.0)
 		var jump := sin(progress * PI)
-		root_offset.y += jump * 0.19
-		left_shoulder_target = Vector3(2.72, 0.0, -0.12)
-		right_shoulder_target = Vector3(2.76, 0.0, 0.12)
+		root_offset.y += jump * 0.19 * _jump_scale
+		left_shoulder_target = Vector3(2.54 + 0.18 * _release_height, 0.0, -0.12 * _follow_through)
+		right_shoulder_target = Vector3(2.58 + 0.18 * _release_height, 0.0, 0.12 * _follow_through)
 		left_elbow_target = Vector3(-0.08, 0.0, 0.0)
-		right_elbow_target = Vector3(0.06 + progress * 0.2, 0.0, 0.0)
+		right_elbow_target = Vector3(0.06 + progress * 0.2 * _follow_through, 0.0, 0.0)
 		torso_target.x = -0.1 * jump
 		head_target.x = 0.08
 
@@ -158,7 +188,7 @@ func play_crossover(side: int) -> void:
 func play_shot_release() -> void:
 	_action = "shot"
 	_action_time = 0.0
-	_action_duration = 0.58
+	_action_duration = 0.58 / maxf(_release_speed, 0.5)
 
 func get_hand_position(side: int) -> Vector3:
 	var hand := _right_hand if side > 0 else _left_hand
@@ -173,7 +203,7 @@ func _advance_action(delta: float) -> void:
 		_action_time = 0.0
 
 func _apply_pose(delta: float, root_offset: Vector3, torso_target: Vector3, head_target: Vector3, left_shoulder_target: Vector3, right_shoulder_target: Vector3, left_elbow_target: Vector3, right_elbow_target: Vector3, left_hip_target: Vector3, right_hip_target: Vector3, left_knee_target: Vector3, right_knee_target: Vector3) -> void:
-	var weight := 1.0 - exp(-delta * 14.0)
+	var weight := 1.0 - exp(-delta * 14.0 * _pose_response)
 	_visual_root.position = _visual_root.position.lerp(root_offset, weight)
 	_lerp_rotation(_torso_root, torso_target, weight)
 	_lerp_rotation(_head_root, head_target, weight)
@@ -355,3 +385,28 @@ func _material(color: Color, roughness: float) -> StandardMaterial3D:
 	material.albedo_color = color
 	material.roughness = roughness
 	return material
+
+func _configure_pbr_materials() -> void:
+	_skin_material.subsurf_scatter_enabled = true
+	_skin_material.subsurf_scatter_skin_mode = true
+	_skin_material.subsurf_scatter_strength = 0.16
+	_skin_material.backlight_enabled = true
+	_skin_material.backlight = Color(0.16, 0.045, 0.025, 1.0)
+	_skin_material.rim_enabled = true
+	_skin_material.rim = 0.18
+	_hair_material.anisotropy_enabled = true
+	_hair_material.anisotropy = 0.5
+	_beard_material.anisotropy_enabled = true
+	_beard_material.anisotropy = 0.32
+	_eye_white_material.clearcoat_enabled = true
+	_eye_white_material.clearcoat = 0.72
+	_eye_white_material.clearcoat_roughness = 0.18
+	_iris_material.clearcoat_enabled = true
+	_iris_material.clearcoat = 0.86
+	_iris_material.clearcoat_roughness = 0.08
+	_lip_material.clearcoat_enabled = true
+	_lip_material.clearcoat = 0.28
+	_lip_material.clearcoat_roughness = 0.42
+	_shoe_material.clearcoat_enabled = true
+	_shoe_material.clearcoat = 0.48
+	_shoe_material.clearcoat_roughness = 0.32

@@ -13,7 +13,9 @@ static func default_profile() -> Dictionary:
 		"sessions_played": 0,
 		"career_points": 0,
 		"field_goals_made": 0,
-		"field_goals_attempted": 0
+		"field_goals_attempted": 0,
+		"animation_style": 0,
+		"physics_model_version": 3
 	}
 
 static func load_profile() -> Dictionary:

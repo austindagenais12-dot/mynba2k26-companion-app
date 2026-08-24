@@ -3,6 +3,9 @@ extends Node3D
 const HUDScript = preload("res://scripts/hud.gd")
 const CareerStore = preload("res://scripts/career_store.gd")
 const PlayerModelScript = preload("res://scripts/player_model.gd")
+const BasketballPhysicsScript = preload("res://scripts/basketball_physics.gd")
+const NetPhysicsScript = preload("res://scripts/net_physics.gd")
+const AnimationCatalog = preload("res://scripts/animation_catalog.gd")
 
 const SESSION_LENGTH := 120.0
 const NAVY := Color("#061735")
@@ -22,6 +25,7 @@ var defender: CharacterBody3D
 var player_model
 var defender_model
 var ball: RigidBody3D
+var net_simulator: Node3D
 var camera: Camera3D
 var score_zone: Area3D
 var hoop_target := Vector3(0.0, 3.05, 11.72)
@@ -50,6 +54,8 @@ var shot_charge_time := 0.0
 var crossover_cooldown := 0.0
 var previous_cross_key := false
 var previous_reset_key := false
+var previous_motion_key := false
+var motion_style_index := 0
 
 var defender_lateral_noise := Vector3.ZERO
 var defender_next_read := 0.0
@@ -62,11 +68,13 @@ func _ready() -> void:
 	if str(profile.get("player_name", "ROOKIE")) == "ROOKIE":
 		profile.player_name = "AUSTIN"
 		CareerStore.save_profile(profile)
+	motion_style_index = posmod(int(profile.get("animation_style", 0)), AnimationCatalog.TOTAL_STYLES)
 	_build_materials()
 	_build_environment()
 	_build_hoop()
 	_build_characters()
 	_build_ball()
+	_build_net()
 	_build_camera()
 	_build_hud()
 	_start_session(true)
@@ -82,6 +90,7 @@ func _physics_process(delta: float) -> void:
 		_start_session(false)
 
 	crossover_cooldown -= delta
+	_process_motion_style_input()
 	_process_player(delta)
 	_process_defender(delta, now)
 	_update_character_animations(delta)
@@ -226,25 +235,14 @@ func _build_hoop() -> void:
 	_make_box(assembly, "BoardSquareOuter", Vector3(0.0, 3.28, 12.325), Vector3(0.66, 0.5, 0.018), materials.orange, false)
 	_make_box(assembly, "BoardSquareInner", Vector3(0.0, 3.28, 12.31), Vector3(0.52, 0.36, 0.02), materials.ice, false)
 
-	var rim_radius := 0.245
-	var rim_segments := 18
+	var rim_radius := 0.235
+	var rim_segments := 32
 	for index in range(rim_segments):
 		var a_angle := TAU * float(index) / float(rim_segments)
 		var b_angle := TAU * float(index + 1) / float(rim_segments)
 		var a := hoop_target + Vector3(cos(a_angle) * rim_radius, 0.0, sin(a_angle) * rim_radius)
 		var b := hoop_target + Vector3(cos(b_angle) * rim_radius, 0.0, sin(b_angle) * rim_radius)
-		_make_cylinder_between(assembly, "Rim%d" % index, a, b, 0.027, materials.orange, true)
-
-	for index in range(12):
-		var angle := TAU * float(index) / 12.0
-		var top := hoop_target + Vector3(cos(angle) * 0.22, -0.03, sin(angle) * 0.22)
-		var bottom := hoop_target + Vector3(cos(angle) * 0.13, -0.48, sin(angle) * 0.13)
-		_make_cylinder_between(assembly, "NetCord%d" % index, top, bottom, 0.008, materials.ice, false)
-	for index in range(12):
-		var angle := TAU * (float(index) + 0.5) / 12.0
-		var a := hoop_target + Vector3(cos(angle) * 0.205, -0.19, sin(angle) * 0.205)
-		var b := hoop_target + Vector3(cos(angle) * 0.145, -0.38, sin(angle) * 0.145)
-		_make_cylinder_between(assembly, "NetCross%d" % index, a, b, 0.006, materials.ice, false)
+		_make_cylinder_between(assembly, "Rim%d" % index, a, b, 0.013, materials.orange, true)
 
 	score_zone = Area3D.new()
 	score_zone.name = "ScoreZone"
@@ -289,19 +287,18 @@ func _build_character(character_name: String, spawn_position: Vector3, jersey_ma
 	model.build(jersey_material, trim_material, show_number, int(profile.get("jersey_number", 7)))
 	if show_number:
 		player_model = model
+		player_model.set_animation_profile(AnimationCatalog.get_profile(motion_style_index))
 	else:
 		defender_model = model
+		defender_model.set_animation_profile(AnimationCatalog.get_profile(417))
 
 	return character
 
 func _build_ball() -> void:
-	ball = RigidBody3D.new()
+	ball = BasketballPhysicsScript.new()
 	ball.name = "Basketball"
 	ball.mass = 0.62
-	ball.linear_damp = 0.025
-	ball.angular_damp = 0.05
-	ball.continuous_cd = true
-	ball.can_sleep = true
+	ball.configure_realistic_physics()
 	ball.collision_layer = 4
 	ball.collision_mask = 1
 	ball.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
@@ -313,14 +310,21 @@ func _build_ball() -> void:
 	ball.physics_material_override = physics_material
 
 	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "PebbledLeatherBall"
 	var sphere_mesh := SphereMesh.new()
 	sphere_mesh.radius = 0.12
 	sphere_mesh.height = 0.24
 	sphere_mesh.radial_segments = 24
 	sphere_mesh.rings = 12
 	mesh_instance.mesh = sphere_mesh
-	mesh_instance.material_override = materials.orange
+	var ball_material := _make_material(Color("#C85818"), 0.78)
+	ball_material.clearcoat_enabled = true
+	ball_material.clearcoat_roughness = 0.86
+	mesh_instance.material_override = ball_material
 	ball.add_child(mesh_instance)
+	_add_ball_seam(Vector3.ZERO)
+	_add_ball_seam(Vector3(PI * 0.5, 0.0, 0.0))
+	_add_ball_seam(Vector3(0.0, 0.0, PI * 0.5))
 
 	var collision := CollisionShape3D.new()
 	var sphere_shape := SphereShape3D.new()
@@ -328,6 +332,25 @@ func _build_ball() -> void:
 	collision.shape = sphere_shape
 	ball.add_child(collision)
 	add_child(ball)
+
+func _add_ball_seam(rotation: Vector3) -> void:
+	var seam := MeshInstance3D.new()
+	seam.name = "RecessedBallSeam"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.116
+	torus.outer_radius = 0.123
+	torus.rings = 32
+	torus.ring_segments = 6
+	seam.mesh = torus
+	seam.material_override = materials.dark
+	seam.rotation = rotation
+	ball.add_child(seam)
+
+func _build_net() -> void:
+	net_simulator = NetPhysicsScript.new()
+	net_simulator.name = "ResponsiveBasketNet"
+	add_child(net_simulator)
+	net_simulator.build(hoop_target, ball)
 
 func _build_camera() -> void:
 	camera = Camera3D.new()
@@ -348,6 +371,7 @@ func _build_hud() -> void:
 	hud.name = "HUD"
 	add_child(hud)
 	hud.build(profile)
+	_refresh_motion_style_hud()
 
 func _process_player(delta: float) -> void:
 	var keyboard_input := Vector2(
@@ -404,6 +428,32 @@ func _process_player(delta: float) -> void:
 		_return_ball_to_player()
 
 	_process_shot_input(delta)
+
+func _process_motion_style_input() -> void:
+	var motion_key := Input.is_key_pressed(KEY_Q)
+	var keyboard_step := 1 if motion_key and not previous_motion_key else 0
+	previous_motion_key = motion_key
+	var requested_step: int = hud.consume_motion_style_step() + keyboard_step
+	if hud.consume_motion_style_random():
+		motion_style_index = AnimationCatalog.random_style(rng)
+	elif requested_step != 0:
+		motion_style_index = posmod(motion_style_index + requested_step, AnimationCatalog.TOTAL_STYLES)
+	else:
+		return
+	profile.animation_style = motion_style_index
+	CareerStore.save_profile(profile)
+	if player_model != null:
+		player_model.set_animation_profile(AnimationCatalog.get_profile(motion_style_index))
+	_refresh_motion_style_hud()
+
+func _refresh_motion_style_hud() -> void:
+	if hud == null:
+		return
+	hud.set_motion_style(
+		motion_style_index,
+		AnimationCatalog.TOTAL_STYLES,
+		AnimationCatalog.get_display_name(motion_style_index)
+	)
 
 func _try_crossover() -> void:
 	if not ball_possessed or crossover_cooldown > 0.0 or charging_shot:
@@ -498,11 +548,18 @@ func _launch_ball(target: Vector3, flight_time: float, shot_value: int) -> void:
 	shot_token += 1
 	ball.freeze = false
 	ball.sleeping = false
-	var safe_time := maxf(0.4, flight_time)
-	var displacement := target - release_position
-	var gravity := Vector3(0.0, -float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)), 0.0)
-	ball.linear_velocity = displacement / safe_time - gravity * (safe_time * 0.5)
-	ball.angular_velocity = Vector3(10.0, 2.0, -6.0)
+	var safe_time := maxf(0.42, flight_time)
+	var horizontal_direction := target - release_position
+	horizontal_direction.y = 0.0
+	horizontal_direction = horizontal_direction.normalized()
+	var backspin_axis := horizontal_direction.cross(Vector3.UP)
+	var distance_weight := clampf(inverse_lerp(1.5, 10.5, horizontal_distance_to_hoop()), 0.0, 1.0)
+	var backspin := backspin_axis * lerpf(15.5, 19.5, distance_weight)
+	ball.angular_velocity = backspin
+	ball.linear_velocity = BasketballPhysicsScript.solve_launch_velocity(release_position, target, safe_time, backspin, ball.mass)
+
+func horizontal_distance_to_hoop() -> float:
+	return Vector2(player.global_position.x, player.global_position.z).distance_to(Vector2(hoop_target.x, hoop_target.z))
 
 func _process_possessed_ball(delta: float) -> void:
 	if not ball_possessed:
@@ -716,6 +773,7 @@ func _make_box(parent: Node3D, object_name: String, position: Vector3, size: Vec
 		body.position = position
 		body.collision_layer = 1
 		body.collision_mask = 6
+		body.physics_material_override = _surface_physics_material(object_name)
 		var collision := CollisionShape3D.new()
 		var shape := BoxShape3D.new()
 		shape.size = size
@@ -748,6 +806,7 @@ func _make_cylinder_between(parent: Node3D, object_name: String, start: Vector3,
 		body.quaternion = rotation
 		body.collision_layer = 1
 		body.collision_mask = 4
+		body.physics_material_override = _surface_physics_material(object_name)
 		var collision := CollisionShape3D.new()
 		var shape := CylinderShape3D.new()
 		shape.radius = radius
@@ -756,6 +815,22 @@ func _make_cylinder_between(parent: Node3D, object_name: String, start: Vector3,
 		body.add_child(collision)
 		parent.add_child(body)
 	return mesh_instance
+
+func _surface_physics_material(object_name: String) -> PhysicsMaterial:
+	var physics_material := PhysicsMaterial.new()
+	if "Rim" in object_name:
+		physics_material.bounce = 0.62
+		physics_material.friction = 0.34
+	elif "Backboard" in object_name or "Board" in object_name:
+		physics_material.bounce = 0.67
+		physics_material.friction = 0.22
+	elif "Court" in object_name:
+		physics_material.bounce = 0.79
+		physics_material.friction = 0.66
+	else:
+		physics_material.bounce = 0.24
+		physics_material.friction = 0.58
+	return physics_material
 
 func _make_polyline(parent: Node3D, points: Array, width: float, material: Material, closed: bool) -> void:
 	if points.size() < 2:

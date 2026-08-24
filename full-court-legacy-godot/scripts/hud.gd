@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const VirtualJoystickScript = preload("res://scripts/virtual_joystick.gd")
+const AUSTIN_PORTRAIT = preload("res://assets/ui/austin_career_portrait_v1_mobile.webp")
 
 const NAVY := Color("#071B3E")
 const NAVY_ALPHA := Color(0.025, 0.08, 0.17, 0.92)
@@ -13,6 +14,8 @@ var sprint_held := false
 var shoot_held := false
 var _crossover_requested := false
 var _reset_requested := false
+var _motion_style_step_requested := 0
+var _motion_style_random_requested := false
 
 var _score_label: Label
 var _clock_label: Label
@@ -22,6 +25,8 @@ var _feedback_label: Label
 var _meter_panel: Control
 var _meter_fill: Control
 var _meter_marker: Control
+var _motion_panel: Panel
+var _motion_style_label: Label
 var _feedback_until := 0.0
 
 func _process(_delta: float) -> void:
@@ -97,6 +102,37 @@ func build(profile: Dictionary) -> void:
 	var reset_button := _make_button(root, "RESET BALL", Vector2(32, 176), Vector2(186, 54), Color(0.08, 0.18, 0.3, 0.86), 16, 18)
 	reset_button.pressed.connect(_on_reset_pressed)
 
+	var motion_button := _make_button(root, "MOTION STUDIO", Vector2(32, 244), Vector2(220, 58), Color(0.06, 0.29, 0.47, 0.92), 16, 18)
+	motion_button.pressed.connect(_toggle_motion_panel)
+	_motion_panel = _make_panel(root, "MotionStudio", Color(0.018, 0.055, 0.12, 0.98), Vector2(560, 245), Vector2(800, 470), 24)
+	_motion_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_motion_panel.z_index = 50
+	_make_label(_motion_panel, "MOTION STUDIO", Vector2(30, 18), Vector2(740, 64), 36, HORIZONTAL_ALIGNMENT_CENTER, ICE)
+	var portrait := TextureRect.new()
+	portrait.name = "AustinCareerPortrait"
+	portrait.texture = AUSTIN_PORTRAIT
+	portrait.position = Vector2(32, 78)
+	portrait.size = Vector2(190, 150)
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_motion_panel.add_child(portrait)
+	_motion_style_label = _make_label(_motion_panel, "STYLE", Vector2(230, 94), Vector2(528, 120), 24, HORIZONTAL_ALIGNMENT_CENTER, WHITE)
+	_motion_style_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var minus_hundred := _make_button(_motion_panel, "-100", Vector2(72, 240), Vector2(140, 72), Color("#294D70"), 18, 24)
+	minus_hundred.pressed.connect(_on_motion_step.bind(-100))
+	var minus_one := _make_button(_motion_panel, "-1", Vector2(244, 240), Vector2(140, 72), Color("#294D70"), 18, 24)
+	minus_one.pressed.connect(_on_motion_step.bind(-1))
+	var plus_one := _make_button(_motion_panel, "+1", Vector2(416, 240), Vector2(140, 72), LAKE_BLUE, 18, 24)
+	plus_one.pressed.connect(_on_motion_step.bind(1))
+	var plus_hundred := _make_button(_motion_panel, "+100", Vector2(588, 240), Vector2(140, 72), LAKE_BLUE, 18, 24)
+	plus_hundred.pressed.connect(_on_motion_step.bind(100))
+	var random_button := _make_button(_motion_panel, "RANDOM STYLE", Vector2(148, 348), Vector2(240, 72), Color("#3C5D7A"), 18, 22)
+	random_button.pressed.connect(_on_motion_random)
+	var close_button := _make_button(_motion_panel, "DONE", Vector2(412, 348), Vector2(240, 72), Color("#0D82CA"), 18, 22)
+	close_button.pressed.connect(_toggle_motion_panel)
+	_motion_panel.hide()
+
 func consume_crossover() -> bool:
 	var requested := _crossover_requested
 	_crossover_requested = false
@@ -106,6 +142,23 @@ func consume_reset() -> bool:
 	var requested := _reset_requested
 	_reset_requested = false
 	return requested
+
+func consume_motion_style_step() -> int:
+	var requested := _motion_style_step_requested
+	_motion_style_step_requested = 0
+	return requested
+
+func consume_motion_style_random() -> bool:
+	var requested := _motion_style_random_requested
+	_motion_style_random_requested = false
+	return requested
+
+func set_motion_style(index: int, total: int, display_name: String) -> void:
+	if _motion_style_label != null:
+		_motion_style_label.text = "%s\nSTYLE %d OF %d" % [display_name, index + 1, total]
+
+func is_motion_picker_open() -> bool:
+	return _motion_panel != null and _motion_panel.visible
 
 func set_score(score: int) -> void:
 	if _score_label != null:
@@ -175,6 +228,16 @@ func _on_cross_pressed() -> void:
 
 func _on_reset_pressed() -> void:
 	_reset_requested = true
+
+func _toggle_motion_panel() -> void:
+	if _motion_panel != null:
+		_motion_panel.visible = not _motion_panel.visible
+
+func _on_motion_step(amount: int) -> void:
+	_motion_style_step_requested += amount
+
+func _on_motion_random() -> void:
+	_motion_style_random_requested = true
 
 func _make_label(parent: Control, content: String, position: Vector2, size: Vector2, font_size: int, horizontal: HorizontalAlignment, color: Color) -> Label:
 	var label := Label.new()

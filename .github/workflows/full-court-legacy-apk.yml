@@ -87,6 +87,8 @@ jobs:
           set -euo pipefail
           godot --headless --editor --path full-court-legacy-godot --quit-after 4
           godot --headless --path full-court-legacy-godot --script res://tests/test_input.gd
+          godot --headless --path full-court-legacy-godot --script res://tests/test_physics.gd
+          godot --headless --path full-court-legacy-godot --script res://tests/test_animation_catalog.gd
           godot --headless --path full-court-legacy-godot --quit-after 20 2>&1 | tee "$RUNNER_TEMP/godot-smoke.log"
           if grep -E "ERROR:|SCRIPT ERROR|Parse Error|Invalid call|Invalid assignment" "$RUNNER_TEMP/godot-smoke.log"; then
             exit 1
@@ -103,14 +105,14 @@ jobs:
           mkdir -p full-court-legacy-godot/build
           godot --headless --path full-court-legacy-godot \
             --export-debug Android \
-            "$GITHUB_WORKSPACE/full-court-legacy-godot/build/FullCourtLegacy_v0.2.apk"
-          test -s full-court-legacy-godot/build/FullCourtLegacy_v0.2.apk
-          sha256sum full-court-legacy-godot/build/FullCourtLegacy_v0.2.apk
+            "$GITHUB_WORKSPACE/full-court-legacy-godot/build/FullCourtLegacy_v0.3.apk"
+          test -s full-court-legacy-godot/build/FullCourtLegacy_v0.3.apk
+          sha256sum full-court-legacy-godot/build/FullCourtLegacy_v0.3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: FullCourtLegacy-Android-v0.2
-          path: full-court-legacy-godot/build/FullCourtLegacy_v0.2.apk
+          name: FullCourtLegacy-Android-v0.3
+          path: full-court-legacy-godot/build/FullCourtLegacy_v0.3.apk
           if-no-files-found: error
           retention-days: 30
