@@ -1,0 +1,2182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080a16">
+  <title>Star Wars: Shattered Fates</title>
+  <style>
+    :root {
+      --bg: #070914;
+      --bg-2: #0d1021;
+      --panel: rgba(17, 20, 38, .86);
+      --panel-strong: #14182d;
+      --panel-soft: rgba(31, 35, 62, .64);
+      --line: rgba(160, 170, 220, .16);
+      --line-bright: rgba(161, 145, 255, .45);
+      --text: #f4f3ff;
+      --muted: #a5a8c3;
+      --dim: #6f7392;
+      --violet: #a899ff;
+      --violet-2: #7365e9;
+      --cyan: #68d6e8;
+      --gold: #ffd37b;
+      --green: #74e0ae;
+      --red: #ff8096;
+      --orange: #ffad72;
+      --shadow: 0 24px 80px rgba(0, 0, 0, .34);
+      --radius: 18px;
+      --radius-sm: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 5%, rgba(104, 214, 232, .10), transparent 28rem),
+        radial-gradient(circle at 82% 12%, rgba(168, 153, 255, .13), transparent 34rem),
+        linear-gradient(145deg, var(--bg), #0a0b18 55%, #100d1f);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: .01em;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .55;
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255,255,255,.58) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 40% 65%, rgba(255,255,255,.35) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 80% 30%, rgba(255,255,255,.45) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 65% 86%, rgba(255,255,255,.24) 0 1px, transparent 1.5px);
+      background-size: 260px 220px, 340px 280px, 420px 320px, 300px 260px;
+      mix-blend-mode: screen;
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    button { color: inherit; }
+
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 3px;
+    }
+
+    .hidden { display: none !important; }
+
+    .screen { min-height: 100vh; position: relative; z-index: 1; }
+
+    .eyebrow {
+      color: var(--cyan);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark .spark {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(104, 214, 232, .7);
+      border-radius: 7px;
+      color: var(--cyan);
+      box-shadow: 0 0 18px rgba(104, 214, 232, .23);
+      font-size: 13px;
+    }
+
+    .setup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1440px;
+      padding: 30px 34px 0;
+      margin: 0 auto;
+    }
+
+    .setup-header .status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .setup-shell {
+      width: min(1440px, calc(100% - 68px));
+      margin: 0 auto;
+      padding: 72px 0 58px;
+    }
+
+    .setup-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
+      gap: 44px;
+      align-items: end;
+      margin-bottom: 34px;
+    }
+
+    .setup-hero h1 {
+      max-width: 820px;
+      margin: 12px 0 18px;
+      font-size: clamp(42px, 7vw, 88px);
+      line-height: .94;
+      letter-spacing: -.075em;
+      font-weight: 800;
+    }
+
+    .setup-hero h1 .accent { color: var(--violet); }
+
+    .setup-hero p {
+      max-width: 700px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    .hero-note {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(30, 34, 63, .75), rgba(19, 20, 37, .74));
+      box-shadow: var(--shadow);
+    }
+
+    .hero-note .note-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .hero-note .note-line:last-child { border-bottom: 0; padding-bottom: 0; }
+    .hero-note .note-line:first-child { padding-top: 0; }
+    .hero-note strong { color: var(--text); font-weight: 700; }
+    .hero-note span { color: var(--muted); text-align: right; }
+
+    .mode-switch {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      margin: 0 0 22px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(6, 7, 17, .45);
+    }
+
+    .mode-switch button {
+      padding: 11px 15px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+
+    .mode-switch button.active {
+      color: var(--text);
+      background: linear-gradient(135deg, var(--violet-2), #4b43b7);
+      box-shadow: 0 6px 18px rgba(115, 101, 233, .28);
+    }
+
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .setup-card { padding: 24px; }
+    .setup-card.origin { grid-column: span 7; }
+    .setup-card.character { grid-column: span 5; }
+    .setup-card.tempo { grid-column: span 5; }
+    .setup-card.preview { grid-column: span 7; }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .panel-head h2, .panel-head h3 {
+      margin: 5px 0 0;
+      font-size: 19px;
+      letter-spacing: -.025em;
+    }
+
+    .panel-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+    .random-chip {
+      padding: 6px 8px;
+      border: 1px solid rgba(104, 214, 232, .24);
+      border-radius: 8px;
+      color: var(--cyan);
+      background: rgba(104, 214, 232, .07);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .form-grid.one { grid-template-columns: 1fr; }
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid rgba(161, 170, 220, .18);
+      border-radius: 11px;
+      color: var(--text);
+      background: rgba(7, 9, 20, .64);
+      transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+
+    input:hover, select:hover, textarea:hover { border-color: rgba(168, 153, 255, .45); }
+    input::placeholder, textarea::placeholder { color: var(--dim); }
+    select option { color: #111326; background: #f2f0ff; }
+    textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
+
+    .field-note { color: var(--dim); font-size: 10px; line-height: 1.45; }
+
+    .preview-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .preview-copy { padding: 3px 0; }
+    .preview-copy h3 { margin: 4px 0 11px; font-size: 22px; letter-spacing: -.035em; }
+    .preview-copy p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .preview-stat-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+    .preview-stat {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(7, 9, 20, .42);
+    }
+
+    .preview-stat span { display: block; color: var(--dim); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+    .preview-stat strong { display: block; margin-top: 7px; color: var(--text); font-size: 13px; line-height: 1.25; }
+
+    .setup-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      grid-column: 1 / -1;
+      padding-top: 4px;
+    }
+
+    .action-note { color: var(--dim); font-size: 11px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 42px;
+      padding: 11px 15px;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      color: var(--text);
+      background: var(--panel-soft);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+
+    .btn:hover { transform: translateY(-2px); border-color: rgba(168, 153, 255, .5); background: rgba(47, 50, 88, .76); }
+    .btn:active { transform: translateY(0); }
+    .btn.primary { background: linear-gradient(135deg, #8f82fa, #5d55d2); box-shadow: 0 10px 24px rgba(115, 101, 233, .24); }
+    .btn.primary:hover { background: linear-gradient(135deg, #aa9eff, #6b61ea); }
+    .btn.ghost { border-color: var(--line); background: transparent; }
+    .btn.danger { border-color: rgba(255, 128, 150, .22); color: #ffadba; background: rgba(255, 128, 150, .08); }
+    .btn.small { min-height: 34px; padding: 8px 10px; font-size: 10px; }
+    .btn.icon { min-width: 36px; padding: 9px; }
+
+    .continue-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-top: 22px;
+      padding: 14px 16px;
+      border: 1px solid rgba(104, 214, 232, .23);
+      border-radius: 13px;
+      background: rgba(104, 214, 232, .07);
+    }
+
+    .continue-card p { margin: 0; color: var(--muted); font-size: 12px; }
+    .continue-card strong { display: block; margin-bottom: 4px; color: var(--text); }
+
+    /* Game shell */
+    .game-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 18px;
+      min-height: 70px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(8, 9, 20, .88);
+      backdrop-filter: blur(20px);
+    }
+
+    .game-topbar .top-center { display: flex; align-items: center; gap: 13px; color: var(--muted); font-size: 11px; }
+    .game-topbar .top-center .era { color: var(--text); font-weight: 800; }
+    .game-topbar .top-center .dot { color: var(--violet); }
+    .top-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    .game-layout {
+      display: grid;
+      grid-template-columns: 235px minmax(0, 1fr) 295px;
+      gap: 0;
+      max-width: 1800px;
+      min-height: calc(100vh - 70px);
+      margin: 0 auto;
+    }
+
+    .left-rail, .right-rail { padding: 22px 16px; }
+    .left-rail { border-right: 1px solid var(--line); }
+    .right-rail { border-left: 1px solid var(--line); }
+
+    .player-badge {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 24px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(27, 30, 54, .5);
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 auto;
+      border-radius: 13px;
+      color: #0d0c1f;
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .player-badge strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .player-badge span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+
+    .nav-label { margin: 0 10px 8px; color: var(--dim); font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; }
+    .nav button {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .nav button:hover { color: var(--text); background: rgba(115, 101, 233, .10); }
+    .nav button.active { color: var(--text); border-color: rgba(168, 153, 255, .28); background: linear-gradient(90deg, rgba(115, 101, 233, .24), rgba(115, 101, 233, .05)); }
+    .nav .nav-icon { width: 18px; color: var(--violet); font-size: 14px; text-align: center; }
+    .rail-bottom { position: sticky; top: 92px; margin-top: 28px; }
+    .rail-tip { padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 9, 20, .35); }
+    .rail-tip p { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+
+    .main-stage { min-width: 0; padding: 26px clamp(18px, 3vw, 48px) 50px; }
+    .view-panel { max-width: 970px; margin: 0 auto; }
+    .view-panel.hidden { display: none; }
+
+    .location-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 15px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .location-bar strong { color: var(--text); font-size: 13px; }
+    .location-bar .location { display: flex; align-items: center; gap: 8px; }
+    .location-icon { color: var(--cyan); }
+    .location-bar .scene-count { color: var(--dim); }
+
+    .scene-card {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(23px, 4vw, 42px);
+      border: 1px solid rgba(168, 153, 255, .23);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 86% 20%, rgba(104, 214, 232, .11), transparent 20rem),
+        radial-gradient(circle at 18% 90%, rgba(168, 153, 255, .10), transparent 24rem),
+        linear-gradient(145deg, rgba(23, 24, 47, .92), rgba(15, 16, 31, .92));
+      box-shadow: 0 25px 75px rgba(0,0,0,.26);
+    }
+
+    .scene-card::after {
+      content: "";
+      position: absolute;
+      right: -110px;
+      bottom: -140px;
+      width: 360px;
+      height: 360px;
+      border: 1px solid rgba(104, 214, 232, .10);
+      border-radius: 50%;
+      box-shadow: 0 0 0 24px rgba(104, 214, 232, .02), 0 0 0 48px rgba(104, 214, 232, .02);
+      pointer-events: none;
+    }
+
+    .scene-card > * { position: relative; z-index: 1; }
+    .scene-kicker { color: var(--cyan); font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+    .scene-card h1 { max-width: 750px; margin: 13px 0 14px; font-size: clamp(27px, 4vw, 46px); line-height: 1.02; letter-spacing: -.055em; }
+    .scene-text { max-width: 760px; margin: 0; color: #c5c6db; font-size: 15px; line-height: 1.75; }
+    .scene-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .tag { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: rgba(8, 9, 20, .35); font-size: 10px; font-weight: 700; }
+    .tag.accent { color: var(--gold); border-color: rgba(255, 211, 123, .26); background: rgba(255, 211, 123, .06); }
+    .tag.good { color: var(--green); border-color: rgba(116, 224, 174, .24); background: rgba(116, 224, 174, .06); }
+    .tag.bad { color: var(--red); border-color: rgba(255, 128, 150, .24); background: rgba(255, 128, 150, .06); }
+
+    .choice-area { display: grid; gap: 10px; margin-top: 28px; }
+    .choice-intro { margin-bottom: 2px; color: var(--dim); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .choice-btn {
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--text);
+      background: rgba(7, 9, 20, .38);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+
+    .choice-btn:hover { transform: translateX(3px); border-color: rgba(104, 214, 232, .46); background: rgba(104, 214, 232, .08); }
+    .choice-number { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--cyan); background: rgba(104, 214, 232, .10); font-size: 12px; font-weight: 900; }
+    .choice-btn strong { display: block; font-size: 12px; }
+    .choice-btn small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .choice-arrow { color: var(--violet); font-size: 18px; }
+
+    .action-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 26px 0 12px; }
+    .action-head h2 { margin: 4px 0 0; font-size: 19px; letter-spacing: -.035em; }
+    .action-head p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+    .action-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    .action-card { min-height: 108px; padding: 13px; border: 1px solid var(--line); border-radius: 13px; color: var(--text); background: rgba(18, 20, 39, .72); cursor: pointer; text-align: left; transition: transform .18s ease, border-color .18s ease, background .18s ease; }
+    .action-card:hover { transform: translateY(-3px); border-color: rgba(168, 153, 255, .48); background: rgba(38, 40, 73, .74); }
+    .action-card:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+    .action-icon { display: grid; place-items: center; width: 27px; height: 27px; margin-bottom: 12px; border-radius: 8px; color: var(--violet); background: rgba(168, 153, 255, .10); font-size: 15px; }
+    .action-card strong { display: block; font-size: 11px; line-height: 1.28; }
+    .action-card small { display: block; margin-top: 5px; color: var(--dim); font-size: 9px; line-height: 1.35; }
+
+    .chronicle { margin-top: 28px; }
+    .chronicle-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .chronicle-head h2 { margin: 0; font-size: 14px; letter-spacing: -.015em; }
+    .chronicle-head span { color: var(--dim); font-size: 10px; }
+    .log-list { display: grid; gap: 7px; }
+    .log-entry { padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: rgba(17, 19, 37, .52); }
+    .log-entry .log-top { display: flex; justify-content: space-between; gap: 14px; color: var(--dim); font-size: 9px; font-weight: 800; letter-spacing: .10em; text-transform: uppercase; }
+    .log-entry strong { display: block; margin: 7px 0 5px; font-size: 12px; }
+    .log-entry p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .log-entry.latest { border-color: rgba(104, 214, 232, .24); background: rgba(104, 214, 232, .05); }
+
+    /* Right rail */
+    .side-section { margin-bottom: 20px; }
+    .side-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+    .side-section-head h3 { margin: 0; color: var(--text); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .side-section-head span { color: var(--dim); font-size: 9px; }
+    .objective-card { padding: 14px; border: 1px solid rgba(255, 211, 123, .22); border-radius: 13px; background: rgba(255, 211, 123, .05); }
+    .objective-card .objective-tag { color: var(--gold); font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .objective-card strong { display: block; margin-top: 8px; font-size: 13px; line-height: 1.3; }
+    .objective-card p { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .objective-progress { height: 4px; margin-top: 13px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.09); }
+    .objective-progress span { display: block; height: 100%; border-radius: inherit; background: var(--gold); }
+
+    .pulse-card { padding: 13px; border: 1px solid var(--line); border-radius: 13px; background: rgba(17, 19, 37, .52); }
+    .meter-row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; color: var(--muted); font-size: 10px; }
+    .meter-row strong { color: var(--text); font-size: 10px; }
+    .meter { height: 5px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
+    .meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+    .meter.heat span { background: linear-gradient(90deg, var(--gold), var(--red)); }
+    .pulse-card .pulse-copy { margin: 12px 0 0; color: var(--dim); font-size: 10px; line-height: 1.5; }
+
+    .nearby-list { display: grid; gap: 7px; }
+    .nearby-person { display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid var(--line); border-radius: 11px; background: rgba(17, 19, 37, .42); }
+    .mini-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; color: #121126; background: linear-gradient(135deg, var(--gold), var(--orange)); font-size: 11px; font-weight: 900; }
+    .nearby-person strong { display: block; font-size: 10px; }
+    .nearby-person span { display: block; margin-top: 3px; color: var(--dim); font-size: 9px; }
+    .relation-mini { margin-left: auto; color: var(--cyan); font-size: 12px; }
+
+    .faction-mini { display: grid; gap: 8px; }
+    .faction-mini-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 9px; }
+    .faction-mini-row strong { width: 64px; overflow: hidden; color: var(--text); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .faction-mini-bar { flex: 1; height: 4px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
+    .faction-mini-bar span { display: block; height: 100%; border-radius: inherit; background: var(--violet); }
+    .faction-mini-row em { width: 25px; color: var(--dim); font-size: 9px; font-style: normal; text-align: right; }
+
+    /* Generated views */
+    .view-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+    .view-header h1 { margin: 5px 0 0; font-size: 32px; letter-spacing: -.055em; }
+    .view-header p { max-width: 540px; margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .view-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .data-card { padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: rgba(17, 19, 37, .58); }
+    .data-card.full { grid-column: 1 / -1; }
+    .data-card h3 { margin: 0 0 12px; font-size: 13px; letter-spacing: -.01em; }
+    .data-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .identity-row { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 13px; }
+    .identity-row .tag { color: var(--text); }
+
+    .stat-list { display: grid; gap: 12px; }
+    .stat-row { display: grid; grid-template-columns: 88px 1fr 24px; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; }
+    .stat-row strong { color: var(--text); font-size: 10px; }
+    .stat-row .meter { height: 7px; }
+    .stat-row .meter span { background: linear-gradient(90deg, var(--violet-2), var(--cyan)); }
+    .stat-row em { color: var(--text); font-size: 10px; font-style: normal; text-align: right; }
+
+    .inventory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .item { padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(7, 9, 20, .35); }
+    .item strong { display: block; font-size: 10px; }
+    .item span { display: block; margin-top: 4px; color: var(--dim); font-size: 9px; line-height: 1.35; }
+
+    .thread-list { display: grid; gap: 9px; }
+    .thread { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(7, 9, 20, .32); }
+    .thread-top { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+    .thread strong { font-size: 11px; }
+    .thread em { color: var(--gold); font-size: 9px; font-style: normal; }
+    .thread p { margin: 6px 0 9px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .thread .meter { height: 4px; }
+
+    .relationship-card { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(17, 19, 37, .58); }
+    .relationship-top { display: flex; align-items: center; gap: 11px; }
+    .relationship-top .mini-avatar { width: 39px; height: 39px; border-radius: 12px; }
+    .relationship-top strong { display: block; font-size: 13px; }
+    .relationship-top span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .relationship-status { margin-left: auto; color: var(--cyan); font-size: 9px; font-weight: 800; letter-spacing: .10em; text-transform: uppercase; text-align: right; }
+    .rel-bars { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px 12px; margin: 15px 0; }
+    .rel-bar-label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 4px; color: var(--dim); font-size: 9px; }
+    .rel-bar-label strong { color: var(--muted); font-size: 9px; }
+    .rel-bar { height: 4px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
+    .rel-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--violet), var(--cyan)); }
+    .rel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .memory-line { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--dim); font-size: 10px; line-height: 1.45; }
+
+    .timeline-card { position: relative; overflow: hidden; padding: 21px; border: 1px solid rgba(168, 153, 255, .25); border-radius: 16px; background: linear-gradient(145deg, rgba(42, 36, 84, .54), rgba(17, 19, 37, .62)); }
+    .timeline-card h2 { margin: 6px 0 7px; font-size: 22px; letter-spacing: -.045em; }
+    .timeline-card p { max-width: 740px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .timeline-track { display: flex; gap: 8px; margin-top: 17px; overflow-x: auto; padding-bottom: 3px; }
+    .timeline-node { min-width: 116px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(7, 9, 20, .35); }
+    .timeline-node.active { border-color: rgba(104, 214, 232, .52); background: rgba(104, 214, 232, .08); }
+    .timeline-node strong { display: block; font-size: 10px; }
+    .timeline-node span { display: block; margin-top: 4px; color: var(--dim); font-size: 9px; }
+
+    .save-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: rgba(17, 19, 37, .58); }
+    .save-card h3 { margin: 0 0 6px; font-size: 13px; }
+    .save-card p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .save-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+    .history-list { display: grid; gap: 8px; }
+    .history-item { display: flex; gap: 10px; padding: 11px; border-left: 2px solid var(--violet); background: rgba(7,9,20,.25); }
+    .history-item .history-day { flex: 0 0 48px; color: var(--cyan); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .history-item strong { display: block; font-size: 10px; }
+    .history-item p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 50;
+      max-width: 340px;
+      padding: 12px 15px;
+      border: 1px solid rgba(104, 214, 232, .35);
+      border-radius: 12px;
+      color: var(--text);
+      background: rgba(20, 23, 45, .94);
+      box-shadow: var(--shadow);
+      font-size: 11px;
+      line-height: 1.45;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1120px) {
+      .game-layout { grid-template-columns: 205px minmax(0, 1fr); }
+      .right-rail { display: none; }
+      .setup-card.origin, .setup-card.character, .setup-card.tempo, .setup-card.preview { grid-column: span 6; }
+    }
+
+    @media (max-width: 820px) {
+      .setup-header { padding: 22px 18px 0; }
+      .setup-shell { width: min(100% - 36px, 680px); padding-top: 48px; }
+      .setup-hero { grid-template-columns: 1fr; gap: 24px; }
+      .setup-hero h1 { font-size: clamp(45px, 13vw, 75px); }
+      .setup-card.origin, .setup-card.character, .setup-card.tempo, .setup-card.preview { grid-column: 1 / -1; }
+      .preview-card { grid-template-columns: 1fr; }
+      .game-topbar { grid-template-columns: 1fr auto; padding: 12px 15px; }
+      .game-topbar .top-center { display: none; }
+      .game-layout { display: block; }
+      .left-rail { position: sticky; top: 69px; z-index: 8; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); background: rgba(8,9,20,.91); backdrop-filter: blur(16px); }
+      .player-badge { flex: 0 0 auto; margin: 0; padding: 6px; border: 0; background: transparent; }
+      .player-badge .avatar { width: 31px; height: 31px; border-radius: 9px; font-size: 13px; }
+      .player-badge span { display: none; }
+      .nav-label, .rail-bottom { display: none; }
+      .nav { display: flex; gap: 2px; overflow-x: auto; }
+      .nav button { width: auto; flex: 0 0 auto; padding: 8px 10px; font-size: 10px; }
+      .nav button .nav-icon { width: auto; }
+      .nav button span:last-child { display: none; }
+      .main-stage { padding: 20px 14px 38px; }
+      .action-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .view-grid { grid-template-columns: 1fr; }
+      .data-card.full { grid-column: auto; }
+      .location-bar { align-items: start; flex-direction: column; gap: 5px; }
+    }
+
+    @media (max-width: 520px) {
+      .setup-actions { align-items: stretch; flex-direction: column; }
+      .setup-actions .btn { width: 100%; }
+      .form-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .scene-card { padding: 23px 19px; border-radius: 17px; }
+      .scene-card h1 { font-size: 31px; }
+      .scene-text { font-size: 13px; }
+      .choice-btn { grid-template-columns: 30px 1fr 14px; padding: 10px; }
+      .preview-stat-stack { grid-template-columns: 1fr 1fr; }
+      .relationship-card { padding: 13px; }
+      .rel-bars { grid-template-columns: 1fr 1fr; }
+      .top-actions .btn { min-width: 36px; padding: 9px; font-size: 0; }
+      .top-actions .btn:first-child::before { content: "↥"; font-size: 14px; }
+      .top-actions .btn:last-child::before { content: "＋"; font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="setupScreen" class="screen">
+    <header class="setup-header">
+      <div class="brand-mark"><span class="spark">✦</span> Starfall Protocol</div>
+      <div class="status">A procedural fan-made RPG prototype</div>
+    </header>
+
+    <main class="setup-shell">
+      <section class="setup-hero">
+        <div>
+          <div class="eyebrow">Star Wars · Shattered Fates</div>
+          <h1>Every galaxy<br>has a <span class="accent">different story.</span></h1>
+          <p>Build a life in the Star Wars galaxy. Become a pilot, outlaw, Force adept, fixer, soldier, diplomat—or something no one has named yet. Your timeline, origin, allies, enemies, and consequences are generated around the choices you make.</p>
+        </div>
+        <div class="hero-note">
+          <div class="note-line"><strong>Living galaxy</strong><span>Factions, news, jobs, rivals</span></div>
+          <div class="note-line"><strong>Canon-aware</strong><span>Major lore anchors protected</span></div>
+          <div class="note-line"><strong>Persistent</strong><span>History, relationships, saves</span></div>
+          <div class="note-line"><strong>Replayable</strong><span>Seeded procedural outcomes</span></div>
+        </div>
+      </section>
+
+      <div class="mode-switch" aria-label="Campaign creation mode">
+        <button id="modeRandom" class="active" type="button">✦ Randomize a galaxy</button>
+        <button id="modeCustom" type="button">⌘ Build my origin</button>
+      </div>
+
+      <div class="setup-grid">
+        <section class="panel setup-card origin">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">01 · Reality architect</div>
+              <h2>Choose where history begins</h2>
+              <p>Leave fields on Random for a new combination every time.</p>
+            </div>
+            <span class="random-chip">Lore guard online</span>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="timelineMode">Timeline source</label>
+              <select id="timelineMode">
+                <option value="random">Random lore era</option>
+                <option value="choose">Choose a lore era</option>
+                <option value="custom">Write a fracture</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="eraSelect">Starting era</label>
+              <select id="eraSelect"></select>
+            </div>
+            <div class="field">
+              <label for="loreTrack">Lore track</label>
+              <select id="loreTrack">
+                <option value="canon">Canon anchors</option>
+                <option value="legends">Legends-flavored remix</option>
+                <option value="fractured">What-if timeline</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="scenarioSelect">Starting scenario</label>
+              <select id="scenarioSelect"></select>
+            </div>
+            <div class="field full">
+              <label for="customTimeline">Custom timeline note <span class="field-note">(optional)</span></label>
+              <textarea id="customTimeline" placeholder="Example: 7 ABY, three months after Endor; the Empire still controls the Mid Rim."></textarea>
+            </div>
+            <div class="field full">
+              <label for="customScenario">Custom opening situation <span class="field-note">(optional)</span></label>
+              <textarea id="customScenario" placeholder="Example: I wake up in an unregistered med-bay with a stolen astromech and a coded message in my pocket."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel setup-card character">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">02 · Make someone worth remembering</div>
+              <h2>Your protagonist</h2>
+              <p>Identity changes the way the galaxy reads you.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field full">
+              <label for="playerName">Name</label>
+              <input id="playerName" type="text" maxlength="32" placeholder="Leave blank to generate a name">
+            </div>
+            <div class="field">
+              <label for="pronouns">Pronouns</label>
+              <select id="pronouns">
+                <option value="they/them">They / them</option>
+                <option value="she/her">She / her</option>
+                <option value="he/him">He / him</option>
+                <option value="custom">Custom / not listed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="species">Species</label>
+              <select id="speciesSelect"></select>
+            </div>
+            <div class="field">
+              <label for="origin">Homeworld</label>
+              <select id="originSelect"></select>
+            </div>
+            <div class="field">
+              <label for="archetype">Archetype</label>
+              <select id="archetypeSelect"></select>
+            </div>
+            <div class="field full">
+              <label for="forcePath">Relationship with the Force</label>
+              <select id="forcePathSelect"></select>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel setup-card tempo">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">03 · Set the feeling</div>
+              <h2>Campaign parameters</h2>
+              <p>These shape the pace, not the ceiling.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="tone">Narrative tone</label>
+              <select id="tone">
+                <option value="cinematic">Cinematic adventure</option>
+                <option value="gritty">Gritty frontier</option>
+                <option value="mysterious">Mystery and Force</option>
+                <option value="political">Political intrigue</option>
+                <option value="chaotic">Chaotic underworld</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pacing">Pacing</label>
+              <select id="pacing">
+                <option value="quick">Quick · 1–2 actions per day</option>
+                <option value="normal" selected>Normal · balanced</option>
+                <option value="detailed">Detailed · more granular</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="difficulty">Risk profile</label>
+              <select id="difficulty">
+                <option value="story">Story-forward</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="hard">Hard consequences</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="seed">Galaxy seed</label>
+              <input id="seed" type="text" inputmode="numeric" maxlength="12" placeholder="Random seed">
+            </div>
+            <div class="field full">
+              <div class="field-note">The same seed recreates the same starting galaxy. Your later decisions still shape the timeline, relationships, and personal history.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel setup-card preview">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">04 · Before the first jump</div>
+              <h2>Campaign preview</h2>
+              <p>Everything marked Random will be rolled as the campaign begins.</p>
+            </div>
+            <button id="randomizeBtn" class="btn ghost small" type="button">⤨ Randomize everything</button>
+          </div>
+          <div class="preview-card">
+            <div class="preview-copy">
+              <h3 id="previewTitle">A new life in an uncharted possibility</h3>
+              <p id="previewText">The galaxy will choose an era, a pressure point, a homeworld, an archetype, and the first person who has a reason to remember you.</p>
+            </div>
+            <div id="previewStats" class="preview-stat-stack"></div>
+          </div>
+        </section>
+
+        <div class="setup-actions">
+          <span class="action-note">No account required · Saves stay on this device unless you export them.</span>
+          <button id="startBtn" class="btn primary" type="button">Begin the campaign <span>→</span></button>
+        </div>
+      </div>
+
+      <div id="continueCard" class="continue-card hidden">
+        <p><strong>Unfinished campaign detected</strong><span id="continueText">Your latest checkpoint is ready.</span></p>
+        <button id="continueBtn" class="btn small" type="button">Continue campaign →</button>
+      </div>
+    </main>
+  </div>
+
+  <div id="gameScreen" class="screen hidden">
+    <header class="game-topbar">
+      <div class="brand-mark"><span class="spark">✦</span> Shattered Fates</div>
+      <div class="top-center"><span id="topEra" class="era">Unknown era</span><span class="dot">•</span><span id="topDate">Cycle 1</span></div>
+      <div class="top-actions">
+        <button id="topSaveBtn" class="btn ghost small" type="button">Save</button>
+        <button id="newCampaignBtn" class="btn ghost small" type="button">New campaign</button>
+      </div>
+    </header>
+
+    <div class="game-layout">
+      <aside class="left-rail">
+        <div class="player-badge">
+          <div id="playerAvatar" class="avatar">✦</div>
+          <div><strong id="railPlayerName">Traveler</strong><span id="railPlayerRole">Unknown path</span></div>
+        </div>
+        <div class="nav-label">Campaign</div>
+        <nav class="nav" aria-label="Campaign sections">
+          <button class="active" data-view="story" type="button"><span class="nav-icon">◈</span><span>Story feed</span></button>
+          <button data-view="character" type="button"><span class="nav-icon">◎</span><span>Character</span></button>
+          <button data-view="relationships" type="button"><span class="nav-icon">◌</span><span>Relationships</span></button>
+          <button data-view="galaxy" type="button"><span class="nav-icon">✧</span><span>Galaxy map</span></button>
+          <button data-view="journal" type="button"><span class="nav-icon">≡</span><span>Chronicle</span></button>
+          <button data-view="save" type="button"><span class="nav-icon">▣</span><span>Save / export</span></button>
+        </nav>
+        <div class="rail-bottom">
+          <div class="rail-tip"><div class="eyebrow">Director's note</div><p>The galaxy remembers patterns, not just outcomes. A small act of mercy can become a future ally—or a weakness someone learns to use.</p></div>
+        </div>
+      </aside>
+
+      <main class="main-stage">
+        <section id="storyView" class="view-panel">
+          <div class="location-bar"><div class="location"><span class="location-icon">⌖</span><strong id="locationName">Unknown</strong><span id="locationRegion">Deep space</span></div><span id="sceneCount" class="scene-count">Cycle 1 · First contact</span></div>
+          <article class="scene-card">
+            <div id="sceneKicker" class="scene-kicker">Campaign initialization</div>
+            <h1 id="sceneTitle">The galaxy is waiting.</h1>
+            <p id="sceneText" class="scene-text">Your story is about to begin.</p>
+            <div id="sceneMeta" class="scene-meta"></div>
+            <div id="choiceArea" class="choice-area"></div>
+          </article>
+          <div class="action-head"><div><div class="eyebrow">Your next move</div><h2>What do you do?</h2><p>Actions move time and create new situations.</p></div><span id="actionHint" class="tag">No path is locked</span></div>
+          <div id="actionGrid" class="action-grid"></div>
+          <section class="chronicle"><div class="chronicle-head"><h2>Recent chronicle</h2><span id="logCount">0 entries</span></div><div id="storyLog" class="log-list"></div></section>
+        </section>
+
+        <section id="characterView" class="view-panel hidden"></section>
+        <section id="relationshipsView" class="view-panel hidden"></section>
+        <section id="galaxyView" class="view-panel hidden"></section>
+        <section id="journalView" class="view-panel hidden"></section>
+        <section id="saveView" class="view-panel hidden"></section>
+      </main>
+
+      <aside class="right-rail">
+        <section class="side-section"><div class="side-section-head"><h3>Current objective</h3><span id="objectiveStage">ACTIVE</span></div><div id="objectiveCard" class="objective-card"></div></section>
+        <section class="side-section"><div class="side-section-head"><h3>World pulse</h3><span id="worldPulseLabel">STABLE</span></div><div id="pulseCard" class="pulse-card"></div></section>
+        <section class="side-section"><div class="side-section-head"><h3>Nearby people</h3><span id="nearbyCount">0 known</span></div><div id="nearbyList" class="nearby-list"></div></section>
+        <section class="side-section"><div class="side-section-head"><h3>Faction signals</h3><span>REPUTATION</span></div><div id="factionMini" class="faction-mini"></div></section>
+      </aside>
+    </div>
+  </div>
+
+  <input id="importFile" type="file" accept="application/json,.json" class="hidden">
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    "use strict";
+
+    const STORAGE_KEY = "starfall-shattered-fates-save-v1";
+    let state = null;
+    let setupMode = "random";
+    let toastTimer = null;
+
+    const FACTIONS = {
+      jedi: { name: "Jedi Order", short: "Jedi", color: "#a899ff" },
+      republic: { name: "Galactic Republic", short: "Republic", color: "#68d6e8" },
+      separatists: { name: "Separatist Alliance", short: "Separatists", color: "#ff8096" },
+      empire: { name: "Galactic Empire", short: "Empire", color: "#c7c8d8" },
+      rebellion: { name: "Rebel Alliance", short: "Rebellion", color: "#74e0ae" },
+      newRepublic: { name: "New Republic", short: "New Republic", color: "#68d6e8" },
+      resistance: { name: "Resistance", short: "Resistance", color: "#ffd37b" },
+      firstOrder: { name: "First Order", short: "First Order", color: "#ff8096" },
+      mandalorians: { name: "Mandalorian Clans", short: "Mandalorians", color: "#ffad72" },
+      hutts: { name: "Hutt Cartels", short: "Hutts", color: "#d7a7ff" },
+      underworld: { name: "Independent Underworld", short: "Underworld", color: "#ffad72" },
+      nihil: { name: "Nihil", short: "Nihil", color: "#ff8096" },
+      nightsisters: { name: "Nightsisters", short: "Nightsisters", color: "#d7a7ff" }
+    };
+
+    const ERAS = [
+      {
+        id: "high-republic",
+        name: "The High Republic",
+        chronology: "232–82 BBY",
+        date: "232 BBY",
+        summary: "The Jedi Order is at its height, hyperspace lanes are opening, and the Republic is reaching beyond the Core. The Nihil turn expansion into a weapon.",
+        locations: [
+          { name: "Starlight Beacon", region: "Outer Rim frontier", desc: "A Republic beacon above the frontier, bright enough to make the unknown feel close." },
+          { name: "Coruscant", region: "Galactic Core", desc: "A city-world of Senate chambers, temples, secrets, and lives stacked above one another." },
+          { name: "Jedha", region: "Holy moon", desc: "A sacred crossroads where pilgrims, kyber seekers, and competing faiths meet." },
+          { name: "Eriadu", region: "Outer Rim corridor", desc: "A hard-edged industrial world tied to shipping, politics, and old money." },
+          { name: "Batuu", region: "Unknown Regions frontier", desc: "A borderland trading post where maps end and rumors begin." }
+        ],
+        factions: ["jedi", "republic", "nihil", "hutts", "underworld"],
+        figures: ["Avar Kriss", "Stellan Gios", "Marchion Ro", "Yoda"],
+        threats: ["Nihil raiders", "a hyperspace anomaly", "a corrupt shipping consortium", "a relic hunter with Republic access"],
+        anchors: ["the Republic's frontier expansion", "the Jedi's high era", "the Nihil threat"]
+      },
+      {
+        id: "clone-wars",
+        name: "The Clone Wars",
+        chronology: "22–19 BBY",
+        date: "21 BBY",
+        summary: "The Galactic Republic and Separatist Alliance wage war across the galaxy. Jedi serve as generals, clone troopers carry impossible orders, and every victory leaves a scar.",
+        locations: [
+          { name: "Coruscant", region: "Galactic capital", desc: "The Republic capital, where military briefings, Senate maneuvering, and the Jedi Temple share the same skyline." },
+          { name: "Ryloth", region: "Twilight sector", desc: "A world caught between occupation, resistance, and the cost of liberation." },
+          { name: "Christophsis", region: "Outer Rim battlefront", desc: "A crystalline world turned into a battlefield of supply lines and desperate holds." },
+          { name: "Mandalore", region: "Mandalorian sector", desc: "A world whose politics are as dangerous as any battlefield." },
+          { name: "Kamino", region: "Stormy reaches", desc: "A hidden ocean world where clone armies and uncomfortable questions share a horizon." }
+        ],
+        factions: ["republic", "jedi", "separatists", "mandalorians", "hutts", "underworld"],
+        figures: ["Obi-Wan Kenobi", "Anakin Skywalker", "Ahsoka Tano", "Captain Rex", "Count Dooku", "General Grievous"],
+        threats: ["a Separatist blockade", "a clone commander's sealed order", "a Senate cover-up", "a droid army remnant"],
+        anchors: ["the Battle of Geonosis", "the Republic–Separatist war", "the fall of the Jedi"]
+      },
+      {
+        id: "imperial-ascendancy",
+        name: "Imperial Ascendancy",
+        chronology: "19–5 BBY",
+        date: "12 BBY",
+        summary: "The Republic has become an Empire. The Jedi are hunted, dissent is criminalized, and survival often means deciding which part of yourself to hide.",
+        locations: [
+          { name: "Lothal", region: "Outer Rim", desc: "An agricultural world under a tightening Imperial grip, with resistance growing in quiet places." },
+          { name: "Corellia", region: "Corellian sector", desc: "Shipyards, smugglers, old families, and Imperial contracts churn beneath the surface." },
+          { name: "Tatooine", region: "Jundland frontier", desc: "A harsh desert world where water, information, and a clean identity all cost something." },
+          { name: "Dathomir", region: "Unknown frontier", desc: "A dangerous red world shaped by old power, old wounds, and the Nightsisters." },
+          { name: "Ferrix", region: "Morakii sector", desc: "A repair town whose people know that every machine carries a story." }
+        ],
+        factions: ["empire", "underworld", "hutts", "mandalorians", "rebellion", "jedi", "nightsisters"],
+        figures: ["Darth Vader", "Mon Mothma", "Bail Organa", "Saw Gerrera", "The Grand Inquisitor", "Cassian Andor"],
+        threats: ["an Imperial Security Bureau audit", "an Inquisitor's rumor", "a stolen kyber shipment", "a local governor's purge"],
+        anchors: ["the rise of the Galactic Empire", "the Imperial hunt for surviving Jedi", "the first organized rebellions"]
+      },
+      {
+        id: "galactic-civil-war",
+        name: "The Galactic Civil War",
+        chronology: "0–4 ABY",
+        date: "2 ABY",
+        summary: "The Rebel Alliance is fighting a larger enemy in open shadow. The Empire controls the lanes, but hope has become a strategic resource.",
+        locations: [
+          { name: "Yavin 4", region: "Massassi temples", desc: "A Rebel base hidden among ancient stone and jungle, alive with plans, pilots, and fear." },
+          { name: "Hoth", region: "Anoat sector", desc: "A frozen Rebel refuge where every warm room has a countdown attached to it." },
+          { name: "Cloud City", region: "Bespin system", desc: "A beautiful floating city balancing commerce, neutrality, and the pressure of the Empire." },
+          { name: "Tatooine", region: "Outer Rim", desc: "A desert crossroads where bounty hunters, farmers, and fugitives cross paths." },
+          { name: "Endor", region: "Moddell sector", desc: "A forest moon whose strategic importance is hidden beneath its quiet canopy." }
+        ],
+        factions: ["rebellion", "empire", "underworld", "hutts", "mandalorians", "jedi"],
+        figures: ["Leia Organa", "Luke Skywalker", "Han Solo", "Chewbacca", "Lando Calrissian", "Wedge Antilles", "Darth Vader"],
+        threats: ["an Imperial checkpoint", "a double agent", "a bounty placed by Jabba's network", "a Rebel cell going dark"],
+        anchors: ["the Battle of Yavin", "the evacuation of Hoth", "the Battle of Endor"]
+      },
+      {
+        id: "new-republic",
+        name: "The New Republic",
+        chronology: "5–34 ABY",
+        date: "9 ABY",
+        summary: "The Empire has fractured, but peace is not the same as safety. Warlords, secret projects, and old loyalties compete with the New Republic's fragile promise.",
+        locations: [
+          { name: "Nevarro", region: "Outer Rim", desc: "A trade world building a future while trying to keep its past from walking through the front door." },
+          { name: "Chandrila", region: "Core", desc: "A polished New Republic world where politics, idealism, and quiet compromise share a table." },
+          { name: "Corellia", region: "Corellian sector", desc: "The shipyards still matter, and everybody knows it—including people who want the Republic to fail." },
+          { name: "Kijimi", region: "Snowbound frontier", desc: "A cold, crowded world of slicers, spice, and information that should not exist." },
+          { name: "Mandalore", region: "Mandalorian sector", desc: "A scarred world trying to decide whether survival means unity, tradition, or reinvention." }
+        ],
+        factions: ["newRepublic", "empire", "mandalorians", "hutts", "underworld", "jedi"],
+        figures: ["Hera Syndulla", "Ahsoka Tano", "Din Djarin", "Bo-Katan Kryze", "Mon Mothma", "Luke Skywalker"],
+        threats: ["an Imperial remnant cell", "a New Republic political scandal", "a warlord's private fleet", "a lost Jedi artifact"],
+        anchors: ["the New Republic's reconstruction", "Imperial remnants", "the Mandalorian resurgence"]
+      },
+      {
+        id: "resistance-era",
+        name: "The Resistance Era",
+        chronology: "34 ABY onward",
+        date: "34 ABY",
+        summary: "The First Order is rising from the edges of the map. The Resistance is small, mobile, and running out of time as old stories awaken in new people.",
+        locations: [
+          { name: "D'Qar", region: "Resistance staging ground", desc: "A jungle base where a small movement prepares for a threat many governments refuse to see." },
+          { name: "Jakku", region: "Western Reaches", desc: "A desert world of wreckage, scavengers, and secrets left behind by a war that never really ended." },
+          { name: "Canto Bight", region: "Cantonica", desc: "A glittering casino city where wealth turns suffering into a background detail." },
+          { name: "Kijimi", region: "Snowbound frontier", desc: "A hard world of slicers and smugglers where resistance can look like simply staying alive." },
+          { name: "Ajan Kloss", region: "Remote jungle moon", desc: "A hidden Resistance refuge built around hope, training, and the weight of the past." }
+        ],
+        factions: ["resistance", "firstOrder", "newRepublic", "underworld", "hutts", "jedi", "mandalorians"],
+        figures: ["Leia Organa", "Rey", "Finn", "Poe Dameron", "Rose Tico", "Kylo Ren", "General Hux"],
+        threats: ["a First Order signal hunt", "a Resistance supply shortage", "a cult searching for a relic", "a spy who knows your old name"],
+        anchors: ["the First Order's rise", "the Resistance", "the awakening of a new generation"]
+      }
+    ];
+
+    const SPECIES = [
+      { id: "human", name: "Human", trait: "Adaptable", bonus: "influence" },
+      { id: "twilek", name: "Twi'lek", trait: "Perceptive", bonus: "influence" },
+      { id: "togruta", name: "Togruta", trait: "Keen senses", bonus: "stealth" },
+      { id: "zabrak", name: "Zabrak", trait: "Unbreakable", bonus: "combat" },
+      { id: "nautolan", name: "Nautolan", trait: "Empathic", bonus: "force" },
+      { id: "mirialan", name: "Mirialan", trait: "Disciplined", bonus: "force" },
+      { id: "rodian", name: "Rodian", trait: "Alert", bonus: "stealth" },
+      { id: "chiss", name: "Chiss", trait: "Strategic", bonus: "tech" },
+      { id: "moncalamari", name: "Mon Calamari", trait: "Inventive", bonus: "tech" },
+      { id: "duros", name: "Duros", trait: "Starwise", bonus: "piloting" },
+      { id: "cathar", name: "Cathar", trait: "Fierce", bonus: "combat" },
+      { id: "droid", name: "Droid", trait: "Modular", bonus: "tech" }
+    ];
+
+    const ORIGINS = [
+      { id: "coruscant", name: "Coruscant", detail: "Raised among towers, transit lanes, and too many secrets." },
+      { id: "tatooine", name: "Tatooine", detail: "The desert taught you patience, improvisation, and the value of water." },
+      { id: "naboo", name: "Naboo", detail: "Beauty and ceremony taught you that politics can hide a knife." },
+      { id: "corellia", name: "Corellia", detail: "You learned that ships are people with engines, flaws, and loyalties." },
+      { id: "ryloth", name: "Ryloth", detail: "Your family history carries the cost of occupation and the strength to outlast it." },
+      { id: "mandalore", name: "Mandalore", detail: "You grew up around armor, oaths, and arguments about what tradition means." },
+      { id: "jedha", name: "Jedha", detail: "The sacred moon made you comfortable with unanswered questions." },
+      { id: "lothal", name: "Lothal", detail: "You know what it feels like when a distant government changes your daily life." },
+      { id: "kamino", name: "Kamino", detail: "Storms and laboratories gave you a complicated view of creation." },
+      { id: "narshaddaa", name: "Nar Shaddaa", detail: "You grew up in the vertical underworld, where every favor has a price." },
+      { id: "geonosis", name: "Geonosis", detail: "You learned early that the ruins of war can still be profitable." },
+      { id: "dathomir", name: "Dathomir", detail: "Old stories, old power, and dangerous beauty shaped your instincts." }
+    ];
+
+    const ARCHETYPES = [
+      { id: "drifter", name: "Frontier Drifter", detail: "A survivor who keeps moving before anyone can decide what you owe them.", bonuses: { piloting: 2, stealth: 1 }, gear: ["patched blaster", "old star chart"] },
+      { id: "guardian", name: "Reluctant Guardian", detail: "You stand between danger and somebody who cannot afford to face it alone.", bonuses: { combat: 2, force: 1 }, gear: ["field armor", "keepsake token"] },
+      { id: "broker", name: "Information Broker", detail: "You know who wants what, and why they are lying about it.", bonuses: { influence: 2, tech: 1 }, gear: ["encrypted datapad", "contact ledger"] },
+      { id: "scoundrel", name: "Scoundrel", detail: "Your luck is a weapon. Your debts are sharper.", bonuses: { stealth: 2, piloting: 1 }, gear: ["concealed holdout", "marker chip"] },
+      { id: "artisan", name: "Shipwright / Artisan", detail: "You understand machines as systems—and people as systems that break differently.", bonuses: { tech: 2, piloting: 1 }, gear: ["tool kit", "custom interface"] },
+      { id: "operative", name: "Covert Operative", detail: "You have lived under names that were never meant to last.", bonuses: { stealth: 2, influence: 1 }, gear: ["forged ident-card", "signal scrambler"] },
+      { id: "adept", name: "Force Adept", detail: "The Force has touched your life, though it has not explained itself.", bonuses: { force: 2, combat: 1 }, gear: ["focus crystal", "weathered journal"] }
+    ];
+
+    const FORCE_PATHS = [
+      { id: "unawakened", name: "Unawakened", detail: "You trust instinct, skill, and the visible world." },
+      { id: "sensitive", name: "Force-sensitive", detail: "The Force speaks in fragments: a feeling, a warning, a door left open." },
+      { id: "light", name: "Drawn to the light", detail: "Compassion is not weakness, but the galaxy will test what it costs you." },
+      { id: "shadow", name: "Shadow-touched", detail: "Power answers quickly when fear is willing to ask the question." },
+      { id: "seeker", name: "Relic seeker", detail: "You study the Force through artifacts, ruins, and the people who survived them." }
+    ];
+
+    const SCENARIOS = [
+      { id: "signal", name: "The Impossible Signal", title: "A signal that should not exist", premise: "A repeating transmission arrives on a frequency that vanished from the records generations ago. It carries your name—and a set of coordinates.", goal: "Find the source of the impossible signal", tags: ["mystery", "force"] },
+      { id: "debt", name: "A Debt in the Void", title: "Someone owns your future", premise: "A job went wrong, a ship is no longer yours, and the person who financed your escape wants repayment before the next hyperspace jump.", goal: "Clear the debt without becoming property", tags: ["underworld", "survival"] },
+      { id: "defector", name: "The Defector's Shadow", title: "You know something dangerous", premise: "You left an organization that does not believe people are allowed to leave. Somewhere in your belongings is proof of what they are planning next.", goal: "Decide who deserves the truth", tags: ["politics", "danger"] },
+      { id: "foundling", name: "Found Among the Ruins", title: "An inheritance with no owner", premise: "A stranger finds you at the edge of a forgotten ruin and says you are carrying an object your family buried long ago.", goal: "Learn what your inheritance is asking of you", tags: ["legacy", "force"] },
+      { id: "cell", name: "The Cell With No Flag", title: "A rebellion before its name", premise: "A handful of people are fighting a power much larger than them. They need a courier, a mechanic, and someone willing to lie convincingly.", goal: "Keep a fragile network alive", tags: ["rebellion", "loyalty"] },
+      { id: "oath", name: "An Unfinished Oath", title: "The promise that followed you", premise: "Someone you once protected is missing. The only clue is an old oath, a broken piece of armor, and a rumor moving through the underworld.", goal: "Find the person your oath could not forget", tags: ["relationship", "honor"] },
+      { id: "archive", name: "The Archive That Walks", title: "A living piece of history", premise: "A damaged droid contains fragments of a record that powerful people have spent years trying to erase. It has chosen you as its next hiding place.", goal: "Protect the archive or sell its secrets", tags: ["droid", "truth"] },
+      { id: "arena", name: "The Last Safe Fight", title: "A name in the arena", premise: "A local promoter offers you a fast route to credits and reputation. The final opponent is somebody you recognize from a life you thought was over.", goal: "Win without losing the person you are", tags: ["combat", "rivalry"] }
+    ];
+
+    const ACTIONS = [
+      { id: "travel", icon: "↗", label: "Plot a course", detail: "Move to a new world", days: 1 },
+      { id: "explore", icon: "⌖", label: "Explore the region", detail: "Find trouble or opportunity", days: 1 },
+      { id: "work", icon: "✧", label: "Take a job", detail: "Credits always create strings", days: 1 },
+      { id: "social", icon: "◌", label: "Meet a contact", detail: "Turn a name into a relationship", days: 1 },
+      { id: "train", icon: "⊹", label: "Train or study", detail: "Improve a skill or the Force", days: 1 },
+      { id: "holonet", icon: "◍", label: "Scan the Holonet", detail: "News, rumors, and leads", days: 1 },
+      { id: "rest", icon: "☾", label: "Lay low", detail: "Recover and reduce heat", days: 1 },
+      { id: "advance", icon: "◷", label: "Advance the clock", detail: "Let the galaxy move", days: 3 }
+    ];
+
+    const FIRST_NAMES = ["Ari", "Tavi", "Kesh", "Ria", "Jax", "Nima", "Sela", "Bram", "Veya", "Odo", "Mira", "Kato", "Juno", "Pax", "Tess", "Daro", "Ryn", "Sorin", "Varn", "Kela", "Zev", "Mako", "Ira", "Nera", "Cato", "Lio", "Voss", "Yara", "Eli", "Suri"];
+    const LAST_NAMES = ["Vale", "Ordo", "Venn", "Sorn", "Taro", "Quell", "Dune", "Kord", "Marr", "Fen", "Tal", "Rin", "Vex", "Lorn", "Arca", "Sol", "Della", "Kade", "Kess", "Nox", "Rell", "Var", "Malk", "Daro", "Pell", "Rusk", "Tann", "Vey", "Korin", "Jex"];
+    const CONTACT_ROLES = ["fixer", "pilot", "medic", "slicer", "archivist", "ranger", "mechanic", "broker", "bounty hunter", "pilgrim", "ex-soldier", "performer"];
+    const PERSONALITIES = ["careful", "restless", "idealistic", "cynical", "protective", "ambitious", "curious", "unreadable", "warm", "volatile"];
+    const ITEMS = {
+      "patched blaster": "Reliable only when treated like a friend.",
+      "old star chart": "Half the routes are wrong. The other half are valuable.",
+      "field armor": "Scuffed protection with one personal modification.",
+      "keepsake token": "A small object that still knows who you were.",
+      "encrypted datapad": "A locked file with more implications than data.",
+      "contact ledger": "Names, favors, and debts in three kinds of handwriting.",
+      "concealed holdout": "A weapon designed for the moment a conversation ends.",
+      "marker chip": "A promise written in a format the underworld respects.",
+      "tool kit": "Enough tools to make a bad situation briefly fixable.",
+      "custom interface": "Your hands know how to use it faster than your eyes do.",
+      "forged ident-card": "The lie is good. The photo is not.",
+      "signal scrambler": "Makes you harder to find and easier to distrust.",
+      "focus crystal": "Not a lightsaber component—yet. It hums when you are afraid.",
+      "weathered journal": "Some pages are yours. Some handwriting is not.",
+      "encrypted holocron fragment": "A sliver of a much larger question.",
+      "imperial access code": "Useful until somebody asks where you got it.",
+      "rebel safehouse key": "One door, one chance, no guarantee of welcome.",
+      "mandalorian signet": "A symbol that opens some doors and closes others.",
+      "medical stim pack": "A single second chance in a compact casing.",
+      "rare spice vial": "Valuable, illegal, and difficult to explain.",
+      "droid memory shard": "A voice waits inside, but it is not ready to speak."
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+    }
+    function titleCase(value) { return String(value).replace(/(^|[-_ ])\w/g, match => match.toUpperCase()); }
+    function hashSeed(value) {
+      const str = String(value || "");
+      let hash = 2166136261;
+      for (let i = 0; i < str.length; i += 1) hash = Math.imul(hash ^ str.charCodeAt(i), 16777619);
+      return (hash >>> 0) || 123456789;
+    }
+    function numericSeed(value) {
+      if (String(value || "").trim() === "") return Math.floor(Math.random() * 900000000) + 100000000;
+      return /^\d+$/.test(String(value).trim()) ? (Number(value) >>> 0) || 1 : hashSeed(value);
+    }
+    function randomName(seedLike) {
+      const seed = numericSeed(seedLike || String(Date.now()));
+      return `${FIRST_NAMES[seed % FIRST_NAMES.length]} ${LAST_NAMES[Math.floor(seed / 17) % LAST_NAMES.length]}`;
+    }
+    function startRng(seed) { return { state: numericSeed(seed) }; }
+    function nextRandom(target) {
+      target.rngState = (Math.imul(target.rngState, 1664525) + 1013904223) >>> 0;
+      return target.rngState / 4294967296;
+    }
+    function randomInt(target, max) { return Math.floor(nextRandom(target) * max); }
+    function randomPick(target, array) { return array.length ? array[randomInt(target, array.length)] : null; }
+    function shuffle(target, array) {
+      const copy = array.slice();
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = randomInt(target, i + 1);
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+    function getEra(id) { return ERAS.find(era => era.id === id) || ERAS[0]; }
+    function getSpecies(id) { return SPECIES.find(item => item.id === id) || SPECIES[0]; }
+    function getOrigin(id) { return ORIGINS.find(item => item.id === id) || ORIGINS[0]; }
+    function getArchetype(id) { return ARCHETYPES.find(item => item.id === id) || ARCHETYPES[0]; }
+    function getForcePath(id) { return FORCE_PATHS.find(item => item.id === id) || FORCE_PATHS[0]; }
+    function getScenario(id) { return SCENARIOS.find(item => item.id === id) || SCENARIOS[0]; }
+    function getFaction(id) { return FACTIONS[id] || { name: id, short: id, color: "#a899ff" }; }
+    function pronounSubject(pronouns) { return pronouns === "she/her" ? "she" : pronouns === "he/him" ? "he" : "they"; }
+    function pronounPossessive(pronouns) { return pronouns === "she/her" ? "her" : pronouns === "he/him" ? "his" : "their"; }
+    function initials(name) { return String(name || "✦").split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase(); }
+    function currentDate() { return state ? `${state.timeline.date} · Cycle ${state.day}` : "Cycle 1"; }
+    function activeFactions() { return (state && state.timeline.factions || []).map(id => getFaction(id)); }
+    function averageRelationship(contact) {
+      const r = contact.relationship;
+      return Math.round((r.trust + r.respect + r.friendship + r.loyalty + r.closeness + r.influence - r.rivalry - r.resentment) / 8);
+    }
+    function relationshipStatus(contact) {
+      const r = averageRelationship(contact);
+      if (contact.recruited) return "Crew member";
+      if (r >= 35) return "Bonded ally";
+      if (r >= 20) return "Trusted ally";
+      if (r >= 8) return "Familiar";
+      if (r <= -25) return "Bitter rival";
+      if (r <= -8) return "Wary";
+      return "Acquaintance";
+    }
+    function relationLevelValue(value) { return clamp(Math.round(((value + 50) / 100) * 100), 0, 100); }
+    function formatSigned(value) { return value > 0 ? `+${value}` : String(value); }
+    function formatStat(stat) { return ({ combat: "Combat", piloting: "Piloting", tech: "Tech", influence: "Influence", stealth: "Stealth", force: "Force" }[stat] || titleCase(stat)); }
+    function tonePhrase() { return state?.settings?.tone === "gritty" ? "The air tastes like metal and old decisions." : state?.settings?.tone === "mysterious" ? "Something unseen seems to notice you noticing it." : state?.settings?.tone === "political" ? "Every polite sentence has a second audience." : state?.settings?.tone === "chaotic" ? "The situation is already moving faster than anyone planned." : "For one breath, the galaxy seems to hold still."; }
+    function pacingDays(base) { return state?.settings?.pacing === "quick" ? Math.max(1, base) : state?.settings?.pacing === "detailed" ? Math.max(1, base) : base; }
+
+    function fillSelect(selectId, items, randomLabel, getValue = item => item.id, getLabel = item => item.name) {
+      const select = $(selectId);
+      select.innerHTML = `<option value="random">${esc(randomLabel)}</option>` + items.map(item => `<option value="${esc(getValue(item))}">${esc(getLabel(item))}</option>`).join("");
+    }
+
+    function populateSetup() {
+      fillSelect("eraSelect", ERAS, "Random era", item => item.id, item => `${item.name} · ${item.chronology}`);
+      fillSelect("scenarioSelect", SCENARIOS, "Random scenario", item => item.id, item => item.name);
+      fillSelect("speciesSelect", SPECIES, "Random species", item => item.id, item => `${item.name} · ${item.trait}`);
+      fillSelect("originSelect", ORIGINS, "Random homeworld", item => item.id, item => item.name);
+      fillSelect("archetypeSelect", ARCHETYPES, "Random archetype", item => item.id, item => item.name);
+      fillSelect("forcePathSelect", FORCE_PATHS, "Random connection", item => item.id, item => item.name);
+      updatePreview();
+      const saved = loadStoredState();
+      if (saved) {
+        $("continueCard").classList.remove("hidden");
+        $("continueText").textContent = `${saved.player?.name || "Your traveler"} · ${saved.timeline?.name || "Unknown era"} · ${saved.day ? `Cycle ${saved.day}` : "Cycle 1"}`;
+      }
+    }
+
+    function setupConfig() {
+      return {
+        timelineMode: $("timelineMode").value,
+        eraId: $("eraSelect").value,
+        loreTrack: $("loreTrack").value,
+        scenarioId: $("scenarioSelect").value,
+        customTimeline: $("customTimeline").value.trim(),
+        customScenario: $("customScenario").value.trim(),
+        name: $("playerName").value.trim(),
+        pronouns: $("pronouns").value,
+        speciesId: $("speciesSelect").value,
+        originId: $("originSelect").value,
+        archetypeId: $("archetypeSelect").value,
+        forcePathId: $("forcePathSelect").value,
+        tone: $("tone").value,
+        pacing: $("pacing").value,
+        difficulty: $("difficulty").value,
+        seed: $("seed").value.trim()
+      };
+    }
+
+    function updatePreview() {
+      const cfg = setupConfig();
+      const seed = cfg.seed || "fresh entropy";
+      const era = cfg.timelineMode === "custom" && cfg.customTimeline ? { name: "Custom fracture", chronology: cfg.customTimeline } : cfg.eraId === "random" || cfg.timelineMode === "random" ? { name: "A randomized lore era", chronology: "Unknown until launch" } : getEra(cfg.eraId);
+      const scenario = cfg.customScenario ? { name: "Your opening situation" } : cfg.scenarioId === "random" ? { name: "A generated pressure point" } : getScenario(cfg.scenarioId);
+      const character = cfg.name || "A generated protagonist";
+      $("previewTitle").textContent = `${character} · ${scenario.name}`;
+      $("previewText").textContent = cfg.customScenario || (cfg.timelineMode === "custom" && cfg.customTimeline ? `${cfg.customTimeline} The lore guard will preserve the recognizable Star Wars anchors while letting your local history diverge.` : `${era.name} begins around ${era.chronology}. ${scenario.premise || "The galaxy will choose the first pressure point."} ${tonePhrasePreview(cfg.tone)}`);
+      const stats = [
+        ["Timeline", era.name],
+        ["Scenario", scenario.name],
+        ["Identity", cfg.speciesId === "random" ? "Any species" : getSpecies(cfg.speciesId).name],
+        ["Seed", seed.length > 14 ? `${seed.slice(0, 14)}…` : seed]
+      ];
+      $("previewStats").innerHTML = stats.map(([label, value]) => `<div class="preview-stat"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("");
+    }
+
+    function tonePhrasePreview(tone) {
+      return tone === "gritty" ? "Expect hard choices and lasting scars." : tone === "mysterious" ? "The Force may leave more questions than answers." : tone === "political" ? "Reputations and alliances will matter as much as blasters." : tone === "chaotic" ? "The underworld is already improvising around you." : "Your choices can become the kind of story people tell later.";
+    }
+
+    function randomizeSetup() {
+      $("timelineMode").value = "random";
+      $("eraSelect").value = "random";
+      $("scenarioSelect").value = "random";
+      $("speciesSelect").value = "random";
+      $("originSelect").value = "random";
+      $("archetypeSelect").value = "random";
+      $("forcePathSelect").value = "random";
+      $("playerName").value = "";
+      $("customTimeline").value = "";
+      $("customScenario").value = "";
+      $("seed").value = String(Math.floor(Math.random() * 900000) + 100000);
+      updatePreview();
+      showToast("Every origin input is randomized. Begin whenever you are ready.");
+    }
+
+    function buildCustomEra(cfg, draft) {
+      const fallback = getEra(cfg.eraId === "random" ? "galactic-civil-war" : cfg.eraId);
+      const note = cfg.customTimeline || "An unrecorded fracture in galactic history";
+      return {
+        ...fallback,
+        id: "custom-fracture",
+        name: "Custom timeline",
+        chronology: note,
+        date: note.split(/[;,.]/)[0].trim() || "Unknown date",
+        summary: `Your timeline begins here: ${note}. Major Star Wars lore anchors remain recognizable, but the local history is yours to bend.`,
+        custom: true,
+        customNote: note,
+        anchors: [...fallback.anchors, "your custom divergence"]
+      };
+    }
+
+    function createCampaign(cfg) {
+      const seed = numericSeed(cfg.seed || String(Date.now()));
+      const base = { rngState: seed };
+      let era;
+      if (cfg.timelineMode === "custom") era = buildCustomEra(cfg, base);
+      else if (cfg.eraId === "random" || cfg.timelineMode === "random") era = randomPick(base, ERAS);
+      else era = getEra(cfg.eraId);
+      const species = cfg.speciesId === "random" ? randomPick(base, SPECIES) : getSpecies(cfg.speciesId);
+      const origin = cfg.originId === "random" ? randomPick(base, ORIGINS) : getOrigin(cfg.originId);
+      const archetype = cfg.archetypeId === "random" ? randomPick(base, ARCHETYPES) : getArchetype(cfg.archetypeId);
+      const forcePath = cfg.forcePathId === "random" ? randomPick(base, FORCE_PATHS) : getForcePath(cfg.forcePathId);
+      const scenario = cfg.customScenario ? { id: "custom", name: "Custom opening", title: "The first decision is yours", premise: cfg.customScenario, goal: "Survive the opening you wrote", tags: ["custom"] } : cfg.scenarioId === "random" ? randomPick(base, SCENARIOS) : getScenario(cfg.scenarioId);
+      const playerName = cfg.name || randomName(base.rngState);
+      const stats = { combat: 2, piloting: 2, tech: 2, influence: 2, stealth: 2, force: 1 };
+      Object.entries(archetype.bonuses).forEach(([stat, amount]) => { stats[stat] += amount; });
+      stats[species.bonus] += 1;
+      if (forcePath.id !== "unawakened") stats.force += 1;
+      const location = randomPick(base, era.locations) || era.locations[0];
+      const factionStanding = {};
+      Object.keys(FACTIONS).forEach(id => { factionStanding[id] = 0; });
+      era.factions.forEach(id => { factionStanding[id] = randomInt(base, 17) - 8; });
+      if (scenario.tags.includes("rebellion")) factionStanding.rebellion = 10;
+      if (scenario.tags.includes("underworld")) factionStanding.underworld = 10;
+      if (scenario.tags.includes("force")) factionStanding.jedi = 6;
+      if (scenario.tags.includes("honor")) factionStanding.mandalorians = 5;
+      const game = {
+        version: 1,
+        rngState: base.rngState,
+        day: 1,
+        turn: 0,
+        player: {
+          name: playerName,
+          pronouns: cfg.pronouns,
+          species: species.id,
+          origin: origin.id,
+          archetype: archetype.id,
+          forcePath: forcePath.id,
+          level: 1,
+          xp: 0,
+          skillPoints: 0,
+          health: 100,
+          maxHealth: 100,
+          credits: 220 + randomInt(base, 180),
+          reputation: 0,
+          notoriety: 0,
+          stats,
+          inventory: [...archetype.gear, "medical stim pack"],
+          perks: []
+        },
+        timeline: {
+          id: era.id,
+          name: era.name,
+          chronology: era.chronology,
+          date: era.date,
+          summary: era.summary,
+          locations: era.locations,
+          factions: era.factions,
+          figures: era.figures,
+          threats: era.threats,
+          anchors: era.anchors,
+          custom: Boolean(era.custom),
+          loreTrack: cfg.loreTrack,
+          customNote: era.customNote || ""
+        },
+        settings: { tone: cfg.tone, pacing: cfg.pacing, difficulty: cfg.difficulty, loreTrack: cfg.loreTrack },
+        scenario: { ...scenario },
+        location,
+        visitedLocations: [location.name],
+        factions: factionStanding,
+        world: { tension: 32 + randomInt(base, 35), stability: 68 - randomInt(base, 25), timelineDrift: 0, news: [], lastPulse: "The galaxy is in motion." },
+        contacts: [],
+        threads: [],
+        log: [],
+        flags: {},
+        currentScene: null,
+        pendingEvent: null,
+        activeView: "story",
+        savedAt: null
+      };
+      state = game;
+      buildInitialContacts();
+      buildInitialThreads();
+      const subject = pronounSubject(state.player.pronouns);
+      const possessive = pronounPossessive(state.player.pronouns);
+      state.currentScene = {
+        kicker: "Campaign initialization",
+        title: scenario.title,
+        text: `${scenario.premise} ${tonePhrase()} ${subject === "they" ? "They" : titleCase(subject)} have arrived on ${state.location.name}, carrying ${possessive} first unanswered question into a galaxy that already has too many.`,
+        tags: [state.timeline.name, species.name, archetype.name],
+        meta: `Origin: ${origin.name} · ${forcePath.name}`
+      };
+      state.log.push({ day: 1, type: "origin", title: `The story begins: ${scenario.title}`, text: `${state.player.name} arrives on ${state.location.name}. The first thread is already warm.`, tags: ["origin"] });
+      state.world.news.push(`${state.location.name}: an unknown traveler has entered the local story.`);
+      saveStoredState(state);
+      showGame();
+      renderGame();
+    }
+
+    function buildInitialContacts() {
+      const count = state.settings.pacing === "detailed" ? 5 : 4;
+      const used = new Set();
+      for (let i = 0; i < count; i += 1) {
+        const name = randomName(state.rngState + i * 41);
+        if (used.has(name)) continue;
+        used.add(name);
+        const factionId = randomPick(state, state.timeline.factions);
+        const contact = {
+          id: `contact-${i + 1}`,
+          name,
+          species: randomPick(state, SPECIES).name,
+          role: randomPick(state, CONTACT_ROLES),
+          factionId,
+          personality: randomPick(state, PERSONALITIES),
+          location: randomPick(state, state.timeline.locations).name,
+          recruited: false,
+          alive: true,
+          relationship: {
+            trust: randomInt(state, 13) - 2,
+            respect: randomInt(state, 13) - 2,
+            friendship: randomInt(state, 10),
+            loyalty: randomInt(state, 8),
+            rivalry: randomInt(state, 7),
+            resentment: randomInt(state, 5),
+            influence: randomInt(state, 8),
+            closeness: randomInt(state, 7)
+          },
+          memories: ["You have not met yet—but the galaxy has a way of arranging introductions."]
+        };
+        state.contacts.push(contact);
+      }
+      if (state.scenario.tags.includes("relationship")) {
+        const contact = state.contacts[0];
+        contact.relationship.closeness += 8;
+        contact.memories.unshift("An unfinished oath connects your stories before the first conversation.");
+      }
+    }
+
+    function buildInitialThreads() {
+      const factionId = randomPick(state, state.timeline.factions);
+      state.threads.push({
+        id: "thread-main",
+        title: state.scenario.goal,
+        description: state.scenario.premise,
+        kind: "origin",
+        factionId,
+        progress: 0,
+        target: 100,
+        heat: 45 + randomInt(state, 35),
+        status: "active",
+        stage: "The first lead is waiting for a decision."
+      });
+      const threat = randomPick(state, state.timeline.threats);
+      state.threads.push({
+        id: "thread-signal",
+        title: titleCase(threat),
+        description: `Rumors around ${state.location.name} point toward ${threat}. It may become a job, a warning, or the thing that finds you first.`,
+        kind: "world",
+        factionId: randomPick(state, state.timeline.factions),
+        progress: randomInt(state, 21),
+        target: 100,
+        heat: 25 + randomInt(state, 45),
+        status: "rumor",
+        stage: "A rumor has entered the chronicle."
+      });
+    }
+
+    function showGame() {
+      $("setupScreen").classList.add("hidden");
+      $("gameScreen").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+
+    function showSetup() {
+      $("gameScreen").classList.add("hidden");
+      $("setupScreen").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "instant" });
+      populateSetup();
+    }
+
+    function saveStoredState(target) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(target));
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function loadStoredState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function loadCampaign(target) {
+      if (!target || !target.player || !target.timeline) return;
+      state = target;
+      if (!state.world) state.world = { tension: 45, stability: 55, timelineDrift: 0, news: [], lastPulse: "The galaxy is in motion." };
+      if (!state.log) state.log = [];
+      if (!state.threads) state.threads = [];
+      if (!state.contacts) state.contacts = [];
+      if (!state.currentScene) state.currentScene = { kicker: "Recovered checkpoint", title: "The story resumes", text: "The galaxy waited while you were away.", tags: [], meta: "Checkpoint restored" };
+      if (state.pendingEvent && !state.pendingEvent.choices) state.pendingEvent = null;
+      showGame();
+      renderGame();
+      showToast("Campaign checkpoint restored.");
+    }
+
+    function manualSave(showMessage = true) {
+      if (!state) return;
+      state.savedAt = new Date().toISOString();
+      const saved = saveStoredState(state);
+      if (showMessage) showToast(saved ? "Checkpoint saved on this device." : "The browser blocked local saving. Use Export Save instead.");
+      renderSaveView();
+    }
+
+    function exportSave() {
+      if (!state) return;
+      const payload = JSON.stringify(state, null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `shattered-fates-${(state.player.name || "campaign").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast("Save exported as a JSON file.");
+    }
+
+    function importSaveFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const imported = JSON.parse(reader.result);
+          if (!imported.player || !imported.timeline || !imported.version) throw new Error("Not a Shattered Fates save");
+          saveStoredState(imported);
+          loadCampaign(imported);
+          showToast("Save imported successfully.");
+        } catch (error) {
+          showToast("That file could not be read as a Shattered Fates save.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function showToast(message) {
+      const toast = $("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
+    function advanceTime(days) {
+      const actualDays = state.settings.pacing === "quick" ? Math.max(1, Math.round(days * .75)) : state.settings.pacing === "detailed" ? days + (days > 1 ? 1 : 0) : days;
+      state.day += actualDays;
+      state.player.health = clamp(state.player.health + (actualDays > 1 ? 2 : 0), 0, state.player.maxHealth);
+      if (state.day % 3 === 0 || actualDays > 1) pulseWorld();
+    }
+
+    function pulseWorld() {
+      const active = state.timeline.factions;
+      const factionId = randomPick(state, active);
+      const faction = getFaction(factionId);
+      const direction = randomInt(state, 2) ? 1 : -1;
+      const shift = 2 + randomInt(state, 7);
+      state.factions[factionId] = clamp((state.factions[factionId] || 0) + direction * shift, -100, 100);
+      state.world.tension = clamp(state.world.tension + (direction > 0 ? 2 : -1) + randomInt(state, 5), 0, 100);
+      state.world.stability = clamp(state.world.stability - (direction > 0 ? 1 : -2) + randomInt(state, 5), 0, 100);
+      const signals = direction > 0 ? ["tightens checkpoints", "moves assets through the sector", "makes an example of a local target", "pulls influence into the open"] : ["loses control of a route", "suffers an internal disagreement", "opens a quiet channel", "leaves a gap in its usual pattern"];
+      const signal = randomPick(state, signals);
+      state.world.lastPulse = `${faction.name} ${signal} near ${state.location.name}.`;
+      state.world.news.unshift(state.world.lastPulse);
+      state.world.news = state.world.news.slice(0, 8);
+      if (randomInt(state, 5) === 0 && state.threads.length < 5) addDynamicThread();
+    }
+
+    function addDynamicThread() {
+      const factionId = randomPick(state, state.timeline.factions);
+      const faction = getFaction(factionId);
+      const hooks = ["a vanished convoy", "a name erased from an archive", "a child with a dangerous gift", "a ship transmitting from the wrong century", "a bounty that keeps changing hands", "a local leader who wants to be believed"];
+      const hook = randomPick(state, hooks);
+      state.threads.push({ id: `thread-${state.threads.length + 1}`, title: `${titleCase(hook)} · ${faction.short}`, description: `${faction.name} is connected to ${hook}. You do not know whether you are being invited in or measured from a distance.`, kind: "emergent", factionId, progress: 0, target: 100, heat: 20 + randomInt(state, 65), status: "new", stage: "The world has generated a new lead." });
+      state.world.news.unshift(`A fresh lead surfaced: ${hook}.`);
+    }
+
+    function getDifficulty(base) {
+      const mode = state.settings.difficulty;
+      return base + (mode === "story" ? -2 : mode === "hard" ? 2 : 0);
+    }
+
+    function checkChoice(choice) {
+      if (!choice.check) return { success: true, label: "Choice", critical: false };
+      const stat = choice.check.stat;
+      const roll = randomInt(state, 20) + 1;
+      const statValue = state.player.stats[stat] || 0;
+      const forceBonus = stat === "force" && state.player.forcePath !== "unawakened" ? 1 : 0;
+      const total = roll + statValue + forceBonus;
+      const difficulty = getDifficulty(choice.check.difficulty);
+      const critical = roll === 20;
+      return { success: critical || total >= difficulty, label: `${formatStat(stat)} check`, critical };
+    }
+
+    function effectBundle(first, second) {
+      const out = { ...(first || {}) };
+      Object.entries(second || {}).forEach(([key, value]) => {
+        if (key === "faction" || key === "relation" || key === "stats") {
+          out[key] = { ...(out[key] || {}), ...value };
+        } else if (typeof value === "number") out[key] = (out[key] || 0) + value;
+        else out[key] = value;
+      });
+      return out;
+    }
+
+    function applyEffects(effects = {}) {
+      const player = state.player;
+      if (typeof effects.credits === "number") player.credits = Math.max(0, player.credits + effects.credits);
+      if (typeof effects.health === "number") player.health = clamp(player.health + effects.health, 0, player.maxHealth);
+      if (typeof effects.reputation === "number") player.reputation = clamp(player.reputation + effects.reputation, -100, 100);
+      if (typeof effects.notoriety === "number") player.notoriety = clamp(player.notoriety + effects.notoriety, 0, 100);
+      if (typeof effects.xp === "number") gainXp(effects.xp);
+      if (effects.stats) Object.entries(effects.stats).forEach(([stat, amount]) => { player.stats[stat] = clamp((player.stats[stat] || 0) + amount, 0, 20); });
+      if (typeof effects.force === "number") player.stats.force = clamp(player.stats.force + effects.force, 0, 20);
+      if (effects.faction) Object.entries(effects.faction).forEach(([id, amount]) => { state.factions[id] = clamp((state.factions[id] || 0) + amount, -100, 100); });
+      if (effects.relation) {
+        const contact = state.contacts.find(item => item.id === effects.relation.id);
+        if (contact) {
+          Object.entries(effects.relation.deltas || {}).forEach(([key, amount]) => { contact.relationship[key] = clamp((contact.relationship[key] || 0) + amount, -50, 100); });
+          if (effects.relation.memory) contact.memories.unshift(effects.relation.memory);
+          contact.memories = contact.memories.slice(0, 5);
+        }
+      }
+      if (effects.item) {
+        if (!player.inventory.includes(effects.item)) player.inventory.push(effects.item);
+      }
+      if (effects.removeItem) {
+        const index = player.inventory.indexOf(effects.removeItem);
+        if (index >= 0) player.inventory.splice(index, 1);
+      }
+      if (effects.location) {
+        state.location = effects.location;
+        if (!state.visitedLocations.includes(effects.location.name)) state.visitedLocations.push(effects.location.name);
+      }
+      if (typeof effects.tension === "number") state.world.tension = clamp(state.world.tension + effects.tension, 0, 100);
+      if (typeof effects.stability === "number") state.world.stability = clamp(state.world.stability + effects.stability, 0, 100);
+      if (typeof effects.timelineDrift === "number") state.world.timelineDrift = clamp(state.world.timelineDrift + effects.timelineDrift, 0, 100);
+      if (typeof effects.threadProgress === "number") advanceThread(effects.threadProgress, effects.threadId || "thread-main");
+      if (effects.threadAdd) addThreadFromEffect(effects.threadAdd);
+      if (effects.flag) state.flags[effects.flag] = true;
+      if (effects.companion) {
+        const contact = state.contacts.find(item => item.id === effects.companion);
+        if (contact) contact.recruited = true;
+      }
+      if (effects.news) {
+        state.world.news.unshift(effects.news);
+        state.world.news = state.world.news.slice(0, 8);
+      }
+      if (player.health <= 0) {
+        player.health = 1;
+        state.flags.nearDeath = true;
+      }
+    }
+
+    function gainXp(amount) {
+      const player = state.player;
+      player.xp += amount;
+      let leveled = false;
+      while (player.xp >= player.level * 100) {
+        player.xp -= player.level * 100;
+        player.level += 1;
+        player.skillPoints += 2;
+        player.maxHealth += 4;
+        player.health = player.maxHealth;
+        leveled = true;
+      }
+      if (leveled) {
+        const perkPool = ["Hard to kill", "Silver-tongued", "Ghost in the signal", "Ace instinct", "Improviser", "A presence in the Force"];
+        const perk = randomPick(state, perkPool);
+        if (!player.perks.includes(perk)) player.perks.push(perk);
+        state.log.push({ day: state.day, type: "level", title: `Level ${player.level}: ${perk}`, text: "Experience changes what you notice—and what the galaxy expects from you.", tags: ["progression"] });
+        showToast(`Level ${player.level} reached: ${perk}`);
+      }
+    }
+
+    function advanceThread(amount, id = "thread-main") {
+      const thread = state.threads.find(item => item.id === id) || state.threads.find(item => item.status === "active") || state.threads[0];
+      if (!thread) return;
+      thread.progress = clamp(thread.progress + amount, 0, thread.target);
+      if (thread.progress >= thread.target) {
+        thread.status = "resolved";
+        thread.stage = "The consequences are now part of the galaxy's history.";
+        state.player.reputation = clamp(state.player.reputation + 4, -100, 100);
+      } else if (thread.progress > 65) {
+        thread.status = "escalating";
+        thread.stage = "The next step is closer—and more dangerous.";
+      } else if (thread.progress > 25) {
+        thread.status = "active";
+        thread.stage = "A pattern is becoming visible.";
+      }
+    }
+
+    function addThreadFromEffect(data) {
+      if (!data || state.threads.some(item => item.title === data.title)) return;
+      state.threads.push({ id: `thread-${state.threads.length + 1}`, title: data.title, description: data.description, kind: "personal", factionId: data.factionId || randomPick(state, state.timeline.factions), progress: 0, target: 100, heat: 45, status: "new", stage: "A new possibility has entered your life." });
+    }
+
+    function makeChoice(label, hint, check, success, failure) {
+      return { label, hint, check, success, failure };
+    }
+
+    function eventFor(actionId) {
+      if (actionId === "travel") return travelEvent();
+      if (actionId === "explore") return exploreEvent();
+      if (actionId === "work") return workEvent();
+      if (actionId === "social") return socialEvent();
+      if (actionId === "train") return trainEvent();
+      if (actionId === "holonet") return holonetEvent();
+      if (actionId === "rest") return restEvent();
+      return advanceEvent();
+    }
+
+    function travelEvent() {
+      const destinations = shuffle(state, state.timeline.locations.filter(item => item.name !== state.location.name)).slice(0, 3);
+      const routeThreat = randomPick(state, state.timeline.threats);
+      return {
+        kicker: "HYPERSPACE ROUTE",
+        title: `Three ways out of ${state.location.name}`,
+        text: `Your navicomputer offers three routes. One is fast, one is quiet, and one passes close to ${routeThreat}. The galaxy rarely labels the dangerous option honestly.`,
+        meta: "Travel changes who can find you—and who you can find.",
+        tags: ["travel", routeThreat],
+        choices: destinations.map((destination, index) => {
+          const stat = index === 0 ? "piloting" : index === 1 ? "stealth" : "tech";
+          return makeChoice(`Run for ${destination.name}`, `${destination.region} · ${index === 0 ? "fast route" : index === 1 ? "quiet route" : "unusual route"}`, { stat, difficulty: 11 + index * 2 }, {
+            title: `You arrive at ${destination.name}`,
+            text: `${destination.desc} The route leaves you with a new angle on the local map and one more reason not to take the obvious path next time.`,
+            effects: { location: destination, credits: index === 0 ? -20 : 5, xp: 13, threadProgress: 8, tension: index === 2 ? 3 : 0, news: `${state.player.name} reached ${destination.name} by an unexpected route.` }
+          }, {
+            title: `The route turns hostile`,
+            text: `The jump spits you out badly aligned. You reach ${destination.name}, but not cleanly. Somebody saw the mistake—or noticed what you carried through it.`,
+            effects: { location: destination, health: -9, credits: -15, xp: 8, notoriety: 2, threadProgress: 5, tension: 4 }
+          });
+        })
+      };
+    }
+
+    function exploreEvent() {
+      const location = state.location;
+      const factionId = randomPick(state, state.timeline.factions);
+      const faction = getFaction(factionId);
+      const discoveries = ["a sealed service tunnel", "a frightened courier", "a hidden shrine", "a wrecked speeder with a live beacon", "a market stall selling impossible parts", "a door that remembers a different key"];
+      const discovery = randomPick(state, discoveries);
+      return {
+        kicker: "LOCAL EXPLORATION",
+        title: `Something is waiting in ${location.name}`,
+        text: `You follow a half-useful rumor and find ${discovery}. ${faction.name} has left a trace nearby, but the trace does not tell you whether this is a warning or an invitation.`,
+        meta: location.desc,
+        tags: ["exploration", faction.short],
+        choices: [
+          makeChoice("Approach openly", "Let the situation see you first", { stat: "influence", difficulty: 11 }, { title: "The truth makes room for you", text: `You step into the open. It is not trust, exactly, but the people around ${location.name} decide you are more useful alive than hidden.`, effects: { credits: 18, reputation: 2, xp: 18, faction: { [factionId]: 5 }, threadProgress: 11, relation: { id: state.contacts[0]?.id, deltas: { respect: 2 }, memory: `You were direct when ${location.name} became uncertain.` } } }, { title: "Open does not mean safe", text: `Your announcement travels farther than intended. You escape with the information, but ${faction.name} now has a description of you.`, effects: { health: -6, notoriety: 4, xp: 10, faction: { [factionId]: -3 }, threadProgress: 6 } }),
+          makeChoice("Stay unseen", "Let the evidence speak without you", { stat: "stealth", difficulty: 12 }, { title: "A quiet discovery", text: `You move like a rumor and recover something useful: a data trace, a name, and a reason to return before anyone else understands the pattern.`, effects: { item: randomPick(state, ["droid memory shard", "imperial access code", "encrypted holocron fragment"]), xp: 22, threadProgress: 15, stability: 2 } }, { title: "The shadows have shadows", text: `Something else is already hiding. You avoid the worst of it, but the discovery costs you a cut, a tool, and the certainty that you were alone.`, effects: { health: -11, xp: 11, threadProgress: 7, notoriety: 1 } }),
+          makeChoice("Follow the strange pull", "Trust the thing you cannot explain", { stat: "force", difficulty: 13 }, { title: "The Force leaves a door open", text: `For a heartbeat, the noise of ${location.name} falls away. You find a path that was not visible a moment ago—and a fragment of an old story that now includes you.`, effects: { force: 1, xp: 26, threadProgress: 18, timelineDrift: 2, item: "encrypted holocron fragment", faction: { jedi: 4 } } }, { title: "The feeling becomes a warning", text: `You follow the pull and find only the echo of someone else's fear. It changes nothing you can prove, but it changes what you are willing to ignore.`, effects: { health: -7, force: 1, xp: 15, timelineDrift: 1 } })
+        ]
+      };
+    }
+
+    function workEvent() {
+      const factionId = randomPick(state, state.timeline.factions);
+      const faction = getFaction(factionId);
+      const jobs = [
+        { name: "a discreet extraction", stat: "stealth" },
+        { name: "a broken shipment recovery", stat: "tech" },
+        { name: "a diplomatic escort", stat: "influence" },
+        { name: "a dangerous route run", stat: "piloting" },
+        { name: "a contract that expects violence", stat: "combat" }
+      ];
+      const job = randomPick(state, jobs);
+      const target = randomPick(state, ["a missing courier", "a sealed crate", "a witness with a false name", "an old military droid", "a stolen navicomputer", "a frightened family"]);
+      return {
+        kicker: "AVAILABLE CONTRACT",
+        title: `${faction.short} offer ${job.name}`,
+        text: `A broker finds you in ${state.location.name} with a job involving ${target}. The credits are real. So is the reason ${faction.name} does not want to handle it directly.`,
+        meta: `Suggested approach: ${formatStat(job.stat)} · Reputation is never the only payment.`,
+        tags: ["work", faction.short, job.stat],
+        choices: [
+          makeChoice("Take the contract", `Trust the job's cleanest version`, { stat: job.stat, difficulty: 12 }, { title: "The job pays in more than credits", text: `You complete ${job.name} with enough control left to ask one question nobody expected. The answer gives you leverage—and a new obligation.`, effects: { credits: 70 + randomInt(state, 65), reputation: 3, xp: 28, faction: { [factionId]: 6 }, threadProgress: 13, threadAdd: { title: `The ${faction.short} favor`, description: `You completed a job for ${faction.name}. They may call on you again, whether you want them to or not.`, factionId } } }, { title: "A clean job becomes a dirty story", text: `The contract was designed with a missing page. You finish the essential part, but the fallout finds you before the credits do.`, effects: { credits: 25, health: -10, notoriety: 5, xp: 17, faction: { [factionId]: -4 }, threadProgress: 7 } }),
+          makeChoice("Renegotiate the terms", "Ask what they are not saying", { stat: "influence", difficulty: 13 }, { title: "You leave with better terms", text: `The broker dislikes the question, then respects the fact you asked it. The contract is smaller, safer, and worth more than it was five minutes ago.`, effects: { credits: 95, reputation: 2, xp: 24, faction: { [factionId]: 4 }, threadProgress: 10 } }, { title: "The broker remembers your nerve", text: `The negotiation fails, but not quietly. You leave without a job and with a new entry in somebody's ledger.`, effects: { credits: -10, notoriety: 4, xp: 12, faction: { [factionId]: -5 }, threadProgress: 4 } }),
+          makeChoice("Ask who else wants it", "Information before action", { stat: "tech", difficulty: 11 }, { title: "The job opens into a conspiracy", text: `The target is not the story. A second name, a duplicated manifest, and a quiet payment reveal a larger thread.`, effects: { credits: 35, xp: 25, threadProgress: 19, item: "encrypted holocron fragment", tension: 4, news: `A contract involving ${faction.short} has become more complicated near ${state.location.name}.` } }, { title: "The trail goes cold", text: `The details are scrubbed before you can pull them free. You learn just enough to know somebody invested in forgetting.`, effects: { credits: 15, xp: 15, threadProgress: 8, timelineDrift: 1 } })
+        ]
+      };
+    }
+
+    function socialEvent() {
+      const contact = randomPick(state, state.contacts);
+      if (!contact) return restEvent();
+      const faction = getFaction(contact.factionId);
+      const topic = randomPick(state, ["an old betrayal", "a missing person", "the next place to go", "a rumor about your origin", "a job neither of you can take alone", "something they saw in a dream"]);
+      return {
+        kicker: "PERSONAL THREAD",
+        title: `${contact.name} has a question`,
+        text: `You find ${contact.name}, a ${contact.personality} ${contact.role} tied to ${faction.name}. They want to talk about ${topic}. Their version of the story leaves room for you to decide what kind of person you are to them.`,
+        meta: `Current relationship: ${relationshipStatus(contact)} · ${contact.location}`,
+        tags: ["relationship", contact.name, faction.short],
+        choices: [
+          makeChoice("Tell them the truth", "Risk being known", { stat: "influence", difficulty: 11 }, { title: `${contact.name} keeps listening`, text: `You share more than is strategically comfortable. ${contact.name} does not solve the problem, but the silence after your confession feels less empty.`, effects: { relation: { id: contact.id, deltas: { trust: 8, friendship: 5, closeness: 7 }, memory: `You told the truth about ${topic}.` }, xp: 20, threadProgress: 9 } }, { title: "The truth lands badly", text: `${contact.name} hears the words but not the intention behind them. They do not leave. They do not move closer either.`, effects: { relation: { id: contact.id, deltas: { trust: -4, resentment: 3 }, memory: `A difficult conversation about ${topic} created distance.` }, xp: 12, threadProgress: 5 } }),
+          makeChoice("Offer a deal", "Turn the feeling into leverage", { stat: "tech", difficulty: 12 }, { title: "A practical kind of trust", text: `You make the conversation useful. ${contact.name} accepts the deal, and the new arrangement gives both of you a reason to answer when the other calls.`, effects: { relation: { id: contact.id, deltas: { respect: 6, trust: 3, influence: 5, closeness: 2 }, memory: `You built a deal around ${topic}.` }, credits: -15, xp: 22, threadProgress: 12 } }, { title: "They wanted a person, not a contract", text: `The offer is clever and completely wrong for the moment. ${contact.name} leaves you with the uncomfortable knowledge that being right can still be a failure.`, effects: { relation: { id: contact.id, deltas: { friendship: -3, resentment: 5 }, memory: `You tried to make ${topic} transactional.` }, xp: 10 } }),
+          makeChoice("Ask what they need", "Give them room to be vulnerable", { stat: "force", difficulty: 10 }, { title: "A bond forms in the quiet", text: `${contact.name} speaks without performing. The thing they need is smaller than you expected, but honoring it makes the future feel wider.`, effects: { relation: { id: contact.id, deltas: { trust: 5, loyalty: 7, friendship: 7, closeness: 8 }, memory: `You asked what they needed, and stayed.` }, reputation: 1, xp: 25, threadProgress: 10 } }, { title: "You hear the fear beneath the words", text: `You understand enough to know the problem is larger than either of you. It is not a solution, but it is the beginning of one.`, effects: { relation: { id: contact.id, deltas: { trust: 2, closeness: 4 }, memory: `You recognized the fear beneath ${topic}.` }, xp: 15, threadProgress: 6 } })
+        ]
+      };
+    }
+
+    function trainEvent() {
+      const options = [
+        { stat: "combat", title: "The body remembers first", text: "You turn a borrowed room, cargo bay, or empty street into a place to practice surviving." },
+        { stat: "piloting", title: "Read the route before it opens", text: "You study old nav data until the lines become instincts instead of information." },
+        { stat: "tech", title: "Make the broken thing useful", text: "A damaged device becomes a teacher when you refuse to throw it away." },
+        { stat: "influence", title: "Every voice has a pressure point", text: "You listen to how people ask for things, and what they call the thing they are afraid to say." },
+        { stat: "stealth", title: "Disappear without leaving", text: "You practice movement, timing, and the difference between quiet and invisible." },
+        { stat: "force", title: "Something answers back", text: "The Force is not a trick you perform. It is a relationship you keep failing to define." }
+      ];
+      const first = randomPick(state, options);
+      const second = randomPick(state, options.filter(item => item.stat !== first.stat));
+      return {
+        kicker: "PERSONAL DEVELOPMENT",
+        title: "A few hours that belong only to you",
+        text: `${tonePhrase()} ${first.text}`,
+        meta: "Training is never only about a number. It changes what options feel possible.",
+        tags: ["growth", formatStat(first.stat)],
+        choices: [
+          makeChoice(`Focus on ${formatStat(first.stat)}`, first.title, { stat: first.stat, difficulty: 10 }, { title: `${formatStat(first.stat)} becomes instinct`, text: `${first.text} By the end, you do not feel transformed. You feel slightly harder to surprise.`, effects: { stats: { [first.stat]: 1 }, xp: 24, threadProgress: 5 } }, { title: "Progress has a cost", text: `You push too hard and turn practice into punishment. The lesson remains, along with the bruise.`, effects: { health: -7, xp: 15, threadProgress: 3 } }),
+          makeChoice(`Study ${formatStat(second.stat)}`, second.title, { stat: second.stat, difficulty: 12 }, { title: `A new angle on ${formatStat(second.stat)}`, text: `${second.text} You find one connection you had missed before, and the next time it matters, you will notice sooner.`, effects: { stats: { [second.stat]: 1 }, xp: 27, threadProgress: 6 } }, { title: "The theory refuses to settle", text: `You spend the time learning what you do not know yet. Frustrating, but useful.`, effects: { xp: 18, threadProgress: 3 } }),
+          makeChoice("Train with a contact", "Let somebody else challenge your assumptions", { stat: "influence", difficulty: 11 }, { title: "You grow together", text: `The exercise turns into an argument, then a laugh, then something that will make the next difficult conversation easier.`, effects: { stats: { [first.stat]: 1 }, xp: 20, relation: { id: state.contacts[0]?.id, deltas: { respect: 5, friendship: 3 }, memory: "You trained together and argued productively." }, threadProgress: 7 } }, { title: "The lesson becomes personal", text: `You learn a limit neither of you was trying to show. It is better to know it now.`, effects: { health: -5, xp: 13, relation: { id: state.contacts[0]?.id, deltas: { rivalry: 3, respect: 2 }, memory: "A training session revealed a new edge to the relationship." } } })
+        ]
+      };
+    }
+
+    function holonetEvent() {
+      const factionId = randomPick(state, state.timeline.factions);
+      const faction = getFaction(factionId);
+      const rumor = randomPick(state, ["a convoy vanished between two safe jumps", "a familiar name appeared on a wanted list", "a local official received an impossible promotion", "someone is buying old war droids", "a Jedi rumor is moving through the pilgrim routes", "the same signal was heard in three eras"]);
+      return {
+        kicker: "HOLO-NET SIGNALS",
+        title: "The galaxy talks when you listen",
+        text: `A fragmented feed ties ${faction.name} to a rumor: ${rumor}. Half of the source has been scrubbed. The other half seems to be waiting for someone like you.`,
+        meta: "Rumors can become leads, enemies, or future history.",
+        tags: ["information", faction.short, "rumor"],
+        choices: [
+          makeChoice("Trace the source", "Follow the signal backward", { stat: "tech", difficulty: 13 }, { title: "The rumor has a pulse", text: `You trace the feed through three dead relays and reach a voice that expected to be forgotten. The information is valuable enough to make you nervous.`, effects: { xp: 25, item: randomPick(state, ["imperial access code", "droid memory shard", "rebel safehouse key"]), threadProgress: 17, tension: 4, faction: { [factionId]: 2 } } }, { title: "The source traces you back", text: `You find the relay. The relay finds you. You cut the connection before it becomes a location, but somebody now knows you were curious.`, effects: { health: -5, notoriety: 5, xp: 16, threadProgress: 8, tension: 5 } }),
+          makeChoice("Sell the rumor", "Information wants a buyer", { stat: "influence", difficulty: 11 }, { title: "A profitable secret", text: `You sell a version of the rumor to somebody who can afford to believe it. The credits are useful. The silence afterward is not.`, effects: { credits: 105, xp: 19, notoriety: 4, faction: { [factionId]: -2 }, threadProgress: 9 } }, { title: "The buyer wanted the whole truth", text: `The price was good until the buyer noticed what you left out. You keep your life, your data, and almost none of the money.`, effects: { credits: 20, notoriety: 3, xp: 12, threadProgress: 5 } }),
+          makeChoice("Broadcast a warning", "Let the signal reach everyone", { stat: "force", difficulty: 14 }, { title: "Your voice changes the pattern", text: `The warning spreads farther than your channel should allow. People move. A convoy reroutes. A future encounter has already changed.`, effects: { reputation: 6, xp: 28, timelineDrift: 5, tension: -3, faction: { [factionId]: -4 }, threadProgress: 21, news: `${state.player.name}'s anonymous warning changes a route near ${state.location.name}.` } }, { title: "The warning becomes noise", text: `Your message enters the stream and disappears beneath a thousand louder emergencies. Still, one person replies with a single word: “Received.”`, effects: { reputation: 1, xp: 17, timelineDrift: 2, threadProgress: 10 } })
+        ]
+      };
+    }
+
+    function restEvent() {
+      const contact = randomPick(state, state.contacts);
+      return {
+        kicker: "A QUIETER CYCLE",
+        title: "The galaxy moves without you",
+        text: `You find a room, a hidden corner, or a ship quiet enough to hear yourself think. ${tonePhrase()} For one cycle, survival does not need to look dramatic.`,
+        meta: "Recovery lowers immediate pressure but may let other threads advance.",
+        tags: ["recovery", "time"],
+        choices: [
+          makeChoice("Sleep without a plan", "Trust tomorrow to arrive", null, { title: "You wake up steadier", text: "The rest repairs more than muscle. You return to the galaxy with fewer sharp edges and one clearer thought.", effects: { health: 22, xp: 8, notoriety: -2, tension: -3, stability: 3 } }, null),
+          makeChoice("Repair your gear", "Turn maintenance into meditation", { stat: "tech", difficulty: 10 }, { title: "Your tools feel like yours again", text: "You tune, clean, and reinforce what you carry. Nothing looks new. Everything works when it matters.", effects: { health: 12, xp: 17, credits: -10, stability: 2, item: "medical stim pack" } }, { title: "The repair reveals a hidden problem", text: "You fix the obvious issue and find the expensive one hiding underneath. At least now you know.", effects: { health: 8, credits: -35, xp: 12 } }),
+          makeChoice("Share the quiet", contact ? `Invite ${contact.name}` : "Invite someone nearby", { stat: "influence", difficulty: 10 }, { title: "Someone remembers the quiet with you", text: contact ? `${contact.name} accepts the invitation. Nothing is solved, but the absence of performance makes the relationship feel more real.` : "A stranger sits nearby and leaves before either of you has to name the moment.", effects: { health: 15, xp: 14, relation: contact ? { id: contact.id, deltas: { friendship: 5, closeness: 5, trust: 2 }, memory: "You shared a quiet moment without needing to fix it." } : null } }, { title: "The quiet does not hold", text: "A message, a noise, or a memory interrupts the rest. You recover less—but you learn what your mind keeps returning to.", effects: { health: 8, xp: 10, threadProgress: 4 } })
+        ]
+      };
+    }
+
+    function advanceEvent() {
+      const thread = state.threads.find(item => item.status !== "resolved") || state.threads[0];
+      const figure = randomPick(state, state.timeline.figures);
+      return {
+        kicker: "THE GALAXY KEEPS MOVING",
+        title: "A few cycles pass",
+        text: `You let time move around you. Elsewhere, ${figure} is part of the history everyone knows—but your own untold corner of the galaxy is changing too. ${thread ? `The thread called “${thread.title}” feels warmer when you return to it.` : "A new thread is waiting somewhere beyond the next jump."}`,
+        meta: "Advance time when you want the world to develop in the background.",
+        tags: ["time", "world state"],
+        choices: [
+          makeChoice("Follow the warmest thread", "Put your attention where pressure is rising", null, { title: "The next lead finds you", text: thread ? `${thread.stage} A message arrives with exactly enough information to make ignoring it feel like a decision.` : "A message arrives from a person who should not know your name.", effects: { xp: 17, threadProgress: 14, tension: 3 } }, null),
+          makeChoice("Change your public story", "Let the galaxy remember you differently", { stat: "influence", difficulty: 12 }, { title: "A new version of you enters circulation", text: "You change routes, language, and the details you offer. It is not quite a lie. It is a life with the sharp edges filed down.", effects: { reputation: 3, notoriety: -5, xp: 19, timelineDrift: 2 } }, { title: "Old names are difficult to bury", text: "The new story is good. Someone who knows the old one is better connected.", effects: { notoriety: 3, xp: 12, threadProgress: 6 } }),
+          makeChoice("Do something only for yourself", "Refuse to become a plot for one day", { stat: "force", difficulty: 10 }, { title: "A future opens without asking permission", text: "You choose a direction because you want it, not because a faction, debt, or prophecy suggested it. That choice becomes more important than it feels now.", effects: { xp: 24, health: 10, stability: 4, timelineDrift: 3, threadProgress: 9 } }, { title: "Even freedom has consequences", text: "The choice is yours. So is the problem that follows it. You would rather have it this way.", effects: { xp: 18, health: 5, timelineDrift: 2, threadProgress: 5 } })
+        ]
+      };
+    }
+
+    function performAction(actionId) {
+      if (!state || state.pendingEvent) return;
+      const action = ACTIONS.find(item => item.id === actionId);
+      if (!action) return;
+      state.turn += 1;
+      advanceTime(pacingDays(action.days));
+      state.pendingEvent = eventFor(actionId);
+      state.currentScene = { ...state.pendingEvent };
+      manualSave(false);
+      renderGame();
+    }
+
+    function resolveChoice(index) {
+      if (!state?.pendingEvent) return;
+      const choice = state.pendingEvent.choices[index];
+      if (!choice) return;
+      const result = checkChoice(choice);
+      const outcome = result.success ? choice.success : (choice.failure || choice.success);
+      const effects = effectBundle(outcome.effects, result.critical ? { xp: 10, reputation: 1 } : {});
+      applyEffects(effects);
+      const resultLead = result.success ? (result.critical ? "A perfect opening." : "The choice holds.") : "The consequence lands.";
+      state.currentScene = { kicker: result.label, title: outcome.title, text: `${resultLead} ${outcome.text}`, meta: choice.hint, tags: result.success ? ["resolved", "forward"] : ["resolved", "complication"] };
+      state.log.push({ day: state.day, type: result.success ? "success" : "complication", title: outcome.title, text: `${resultLead} ${outcome.text}`, tags: result.success ? ["success"] : ["complication"] });
+      state.pendingEvent = null;
+      if (randomInt(state, 7) === 0) pulseWorld();
+      manualSave(false);
+      renderGame();
+    }
+
+    function relationshipAction(contactId, actionId) {
+      const contact = state.contacts.find(item => item.id === contactId);
+      if (!contact) return;
+      const faction = getFaction(contact.factionId);
+      state.turn += 1;
+      advanceTime(1);
+      let title = "A relationship changes shape";
+      let text = "";
+      let deltas = {};
+      let effects = {};
+      if (actionId === "talk") {
+        title = `You talk with ${contact.name}`;
+        text = `${contact.name} shares a version of the truth. You offer one of your own. The exchange is not equal yet, but it is real.`;
+        deltas = { trust: 5, friendship: 4, closeness: 4 };
+        contact.memories.unshift("You made time for a real conversation.");
+        effects = { xp: 12 };
+      } else if (actionId === "help") {
+        title = `You help ${contact.name}`;
+        const cost = 25 + randomInt(state, 35);
+        if (state.player.credits < cost) {
+          title = `${contact.name} sees what you cannot afford`;
+          text = `You want to help, but your credits do not stretch far enough. ${contact.name} appreciates the attempt—and now knows one of your limits.`;
+          deltas = { trust: 2, closeness: 1, resentment: 1 };
+          effects = { xp: 6 };
+        } else {
+          state.player.credits -= cost;
+          text = `You spend ${cost} credits, time, and a little leverage to make ${contact.name}'s problem smaller. ${faction.name} may notice the favor.`;
+          deltas = { trust: 7, loyalty: 6, friendship: 3, influence: 3 };
+          effects = { xp: 20, reputation: 1, faction: { [contact.factionId]: 2 } };
+        }
+      } else if (actionId === "challenge") {
+        title = `You challenge ${contact.name}`;
+        const result = checkChoice({ check: { stat: "combat", difficulty: 12 } });
+        if (result.success) {
+          text = `The challenge ends with bruises and a line neither of you can pretend was not crossed. ${contact.name} respects that you showed up.`;
+          deltas = { respect: 8, rivalry: 4, resentment: 1 };
+          effects = { xp: 22, health: -5 };
+        } else {
+          text = `${contact.name} finds the angle you missed. The loss stings less than the realization that they were holding back.`;
+          deltas = { respect: 3, rivalry: 7, resentment: 3 };
+          effects = { xp: 15, health: -12 };
+        }
+      } else if (actionId === "recruit") {
+        title = `You ask ${contact.name} to join your crew`;
+        const score = averageRelationship(contact) + contact.relationship.trust + contact.relationship.respect;
+        if (score >= 32 || contact.recruited) {
+          contact.recruited = true;
+          text = `${contact.name} does not call it loyalty yet. They simply bring their gear, close the hatch, and choose your direction for now.`;
+          deltas = { loyalty: 8, trust: 4, closeness: 5 };
+          effects = { xp: 28, companion: contact.id, threadProgress: 9 };
+        } else {
+          text = `${contact.name} hears the offer as a question about the future. They are not ready to answer it.`;
+          deltas = { trust: -1, resentment: 1, respect: 2 };
+          effects = { xp: 8 };
+        }
+      }
+      applyEffects({ ...effects, relation: { id: contact.id, deltas, memory: contact.memories[0] || "The relationship changed during a difficult cycle." } });
+      state.currentScene = { kicker: "RELATIONSHIP UPDATE", title, text, meta: `${contact.name} · ${relationshipStatus(contact)}`, tags: ["relationship", relationshipStatus(contact)] };
+      state.log.push({ day: state.day, type: "relationship", title, text, tags: ["relationship"] });
+      manualSave(false);
+      renderGame();
+      setActiveView("relationships");
+    }
+
+    function renderGame() {
+      if (!state) return;
+      $("topEra").textContent = state.timeline.custom ? "Custom fracture" : state.timeline.name;
+      $("topDate").textContent = currentDate();
+      $("railPlayerName").textContent = state.player.name;
+      $("railPlayerRole").textContent = `${getArchetype(state.player.archetype).name} · Level ${state.player.level}`;
+      $("playerAvatar").textContent = initials(state.player.name);
+      $("locationName").textContent = state.location.name;
+      $("locationRegion").textContent = state.location.region;
+      $("sceneCount").textContent = `Cycle ${state.day} · Turn ${state.turn}`;
+      const scene = state.currentScene || { kicker: "Campaign", title: "The galaxy is waiting.", text: "Your story is about to begin.", tags: [], meta: "" };
+      $("sceneKicker").textContent = scene.kicker || "Campaign";
+      $("sceneTitle").textContent = scene.title || "The galaxy is waiting.";
+      $("sceneText").textContent = scene.text || "";
+      $("sceneMeta").innerHTML = [scene.meta, ...(scene.tags || [])].filter(Boolean).map((tag, index) => `<span class="tag ${index === 0 ? "accent" : ""}">${esc(tag)}</span>`).join("");
+      renderChoiceArea();
+      renderActionGrid();
+      renderStoryLog();
+      renderObjective();
+      renderPulse();
+      renderNearby();
+      renderFactionMini();
+      renderViews();
+      document.querySelectorAll(".nav button").forEach(button => button.classList.toggle("active", button.dataset.view === state.activeView));
+    }
+
+    function renderChoiceArea() {
+      const area = $("choiceArea");
+      if (!state.pendingEvent) { area.innerHTML = ""; return; }
+      area.innerHTML = `<div class="choice-intro">Choose how the moment becomes history</div>` + state.pendingEvent.choices.map((choice, index) => `<button class="choice-btn" type="button" data-choice="${index}"><span class="choice-number">${index + 1}</span><span><strong>${esc(choice.label)}</strong><small>${esc(choice.hint || "")}</small></span><span class="choice-arrow">›</span></button>`).join("");
+      area.querySelectorAll("[data-choice]").forEach(button => button.addEventListener("click", () => resolveChoice(Number(button.dataset.choice))));
+    }
+
+    function renderActionGrid() {
+      const grid = $("actionGrid");
+      grid.innerHTML = ACTIONS.map(action => `<button class="action-card" type="button" data-action="${action.id}" ${state.pendingEvent ? "disabled" : ""}><span class="action-icon">${action.icon}</span><strong>${esc(action.label)}</strong><small>${esc(action.detail)} · ${action.days} ${action.days === 1 ? "cycle" : "cycles"}</small></button>`).join("");
+      grid.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => performAction(button.dataset.action)));
+      $("actionHint").textContent = state.pendingEvent ? "Resolve the scene first" : `${state.player.credits} credits · ${state.player.health}/${state.player.maxHealth} vitality`;
+    }
+
+    function renderStoryLog() {
+      const entries = state.log.slice(-6).reverse();
+      $("logCount").textContent = `${state.log.length} ${state.log.length === 1 ? "entry" : "entries"}`;
+      $("storyLog").innerHTML = entries.map((entry, index) => `<article class="log-entry ${index === 0 ? "latest" : ""}"><div class="log-top"><span>${esc(entry.type || "chronicle")}</span><span>Cycle ${esc(entry.day)}</span></div><strong>${esc(entry.title)}</strong><p>${esc(entry.text)}</p></article>`).join("");
+    }
+
+    function renderObjective() {
+      const thread = state.threads.find(item => item.status === "active" || item.status === "escalating" || item.status === "new") || state.threads[0];
+      if (!thread) { $("objectiveCard").innerHTML = "<p>No active objective.</p>"; return; }
+      $("objectiveStage").textContent = String(thread.status).toUpperCase();
+      $("objectiveCard").innerHTML = `<div class="objective-tag">${esc(thread.kind)} thread</div><strong>${esc(thread.title)}</strong><p>${esc(thread.stage)}</p><div class="objective-progress"><span style="width:${clamp(thread.progress,0,100)}%"></span></div>`;
+    }
+
+    function renderPulse() {
+      const tension = state.world.tension;
+      const stability = state.world.stability;
+      const label = tension >= 72 ? "VOLATILE" : tension >= 50 ? "RESTLESS" : "STABLE";
+      $("worldPulseLabel").textContent = label;
+      $("pulseCard").innerHTML = `<div class="meter-row"><span>Galaxy tension</span><strong>${tension}%</strong></div><div class="meter heat"><span style="width:${tension}%"></span></div><div class="meter-row" style="margin-top:12px"><span>Local stability</span><strong>${stability}%</strong></div><div class="meter"><span style="width:${stability}%"></span></div><p class="pulse-copy">${esc(state.world.lastPulse)}${state.world.timelineDrift ? ` Timeline drift: ${state.world.timelineDrift}%.` : ""}</p>`;
+    }
+
+    function renderNearby() {
+      const nearby = state.contacts.slice(0, 4);
+      $("nearbyCount").textContent = `${state.contacts.length} known`;
+      $("nearbyList").innerHTML = nearby.map(contact => `<div class="nearby-person"><span class="mini-avatar">${initials(contact.name)}</span><div><strong>${esc(contact.name)}</strong><span>${esc(contact.role)} · ${esc(contact.location)}</span></div><span class="relation-mini">${averageRelationship(contact) >= 0 ? "↗" : "↘"}</span></div>`).join("");
+    }
+
+    function renderFactionMini() {
+      const ids = state.timeline.factions.slice(0, 5);
+      $("factionMini").innerHTML = ids.map(id => { const value = state.factions[id] || 0; const width = clamp(Math.abs(value) * .5 + 8, 8, 58); return `<div class="faction-mini-row"><strong title="${esc(getFaction(id).name)}">${esc(getFaction(id).short)}</strong><span class="faction-mini-bar"><span style="width:${width}%;background:${getFaction(id).color};opacity:${value < 0 ? .45 : 1}"></span></span><em>${formatSigned(value)}</em></div>`; }).join("");
+    }
+
+    function setActiveView(view) {
+      if (!state) return;
+      state.activeView = view;
+      ["story", "character", "relationships", "galaxy", "journal", "save"].forEach(name => { const node = $(`${name}View`); if (node) node.classList.toggle("hidden", name !== view); });
+      document.querySelectorAll(".nav button").forEach(button => button.classList.toggle("active", button.dataset.view === view));
+      if (view !== "story") renderViews();
+    }
+
+    function renderViews() {
+      renderCharacterView();
+      renderRelationshipsView();
+      renderGalaxyView();
+      renderJournalView();
+      renderSaveView();
+      ["story", "character", "relationships", "galaxy", "journal", "save"].forEach(name => { const node = $(`${name}View`); if (node) node.classList.toggle("hidden", name !== state.activeView); });
+    }
+
+    function renderCharacterView() {
+      const p = state.player;
+      const species = getSpecies(p.species);
+      const origin = getOrigin(p.origin);
+      const archetype = getArchetype(p.archetype);
+      const force = getForcePath(p.forcePath);
+      const xpWidth = clamp((p.xp / (p.level * 100)) * 100, 0, 100);
+      $("characterView").innerHTML = `<div class="view-header"><div><div class="eyebrow">PLAYER DOSSIER · LEVEL ${p.level}</div><h1>${esc(p.name)}</h1><p>${esc(archetype.detail)} You are currently on ${esc(state.location.name)}, carrying ${esc(state.scenario.goal.toLowerCase())} into the next cycle.</p></div><div class="tag accent">${esc(p.credits)} credits</div></div><div class="view-grid"><div class="data-card"><h3>Identity</h3><div class="identity-row"><span class="tag">${esc(species.name)}</span><span class="tag">${esc(origin.name)}</span><span class="tag">${esc(archetype.name)}</span><span class="tag">${esc(force.name)}</span></div><p>${esc(origin.detail)} ${esc(force.detail)}</p></div><div class="data-card"><h3>Progression</h3><div class="meter-row"><span>Experience</span><strong>${p.xp} / ${p.level * 100}</strong></div><div class="meter"><span style="width:${xpWidth}%"></span></div><p style="margin-top:12px">${p.skillPoints} skill point${p.skillPoints === 1 ? "" : "s"} available · ${p.reputation} reputation · ${p.notoriety} notoriety</p></div><div class="data-card"><h3>Core attributes</h3><div class="stat-list">${Object.entries(p.stats).map(([stat, value]) => `<div class="stat-row"><strong>${formatStat(stat)}</strong><div class="meter"><span style="width:${clamp(value * 5, 4, 100)}%"></span></div><em>${value}</em></div>`).join("")}</div></div><div class="data-card"><h3>Perks & traits</h3>${p.perks.length ? `<div class="identity-row">${p.perks.map(perk => `<span class="tag good">✦ ${esc(perk)}</span>`).join("")}</div>` : "<p>Your first major perk will emerge when experience changes your options.</p>"}<p style="margin-top:12px"><strong>${esc(species.trait)}</strong> species trait · ${esc(archetype.detail)}</p></div><div class="data-card full"><h3>Inventory</h3><div class="inventory">${p.inventory.map(item => `<div class="item"><strong>${esc(item)}</strong><span>${esc(ITEMS[item] || "A useful object with an unfinished story.")}</span></div>`).join("")}</div></div>`;
+    }
+
+    function renderRelationshipsView() {
+      const cards = state.contacts.map(contact => { const relation = contact.relationship; const bars = ["trust", "respect", "friendship", "loyalty", "rivalry", "resentment", "influence", "closeness"]; return `<article class="relationship-card"><div class="relationship-top"><span class="mini-avatar">${initials(contact.name)}</span><div><strong>${esc(contact.name)}</strong><span>${esc(contact.species)} · ${esc(contact.role)} · ${esc(getFaction(contact.factionId).short)}</span></div><span class="relationship-status">${esc(relationshipStatus(contact))}</span></div><div class="rel-bars">${bars.map(key => `<div><div class="rel-bar-label"><span>${titleCase(key)}</span><strong>${formatSigned(relation[key])}</strong></div><div class="rel-bar"><span style="width:${relationLevelValue(relation[key])}%"></span></div></div>`).join("")}</div><div class="rel-actions"><button class="btn small" type="button" data-rel-action="talk" data-contact="${contact.id}">Talk</button><button class="btn small" type="button" data-rel-action="help" data-contact="${contact.id}">Help</button><button class="btn small" type="button" data-rel-action="challenge" data-contact="${contact.id}">Challenge</button><button class="btn small" type="button" data-rel-action="recruit" data-contact="${contact.id}">${contact.recruited ? "Crew member" : "Recruit"}</button></div><div class="memory-line">Last memory: ${esc(contact.memories[0] || "No shared history yet.")}</div></article>`; }).join("");
+      $("relationshipsView").innerHTML = `<div class="view-header"><div><div class="eyebrow">SOCIAL GRAPH · ${state.contacts.length} KNOWN</div><h1>People remember.</h1><p>Trust is not the same as friendship. Respect is not the same as loyalty. Every dimension can move independently, and each relationship stores its own history.</p></div><div class="tag">${state.contacts.filter(item => item.recruited).length} in crew</div></div><div class="view-grid">${cards}</div>`;
+      $("relationshipsView").querySelectorAll("[data-rel-action]").forEach(button => button.addEventListener("click", () => relationshipAction(button.dataset.contact, button.dataset.relAction)));
+    }
+
+    function renderGalaxyView() {
+      const era = state.timeline;
+      const nodes = ERAS.map(item => `<div class="timeline-node ${item.id === era.id ? "active" : ""}"><strong>${esc(item.name.replace("The ", ""))}</strong><span>${esc(item.chronology)}</span></div>`).join("");
+      const threads = state.threads.map(thread => `<div class="thread"><div class="thread-top"><strong>${esc(thread.title)}</strong><em>${esc(thread.status)}</em></div><p>${esc(thread.description)}</p><div class="meter"><span style="width:${clamp(thread.progress, 0, 100)}%"></span></div></div>`).join("");
+      const factions = state.timeline.factions.map(id => { const value = state.factions[id] || 0; return `<div class="stat-row"><strong>${esc(getFaction(id).short)}</strong><div class="meter"><span style="width:${clamp(Math.abs(value) * .5 + 8, 8, 58)}%;background:${getFaction(id).color};opacity:${value < 0 ? .5 : 1}"></span></div><em>${formatSigned(value)}</em></div>`; }).join("");
+      $("galaxyView").innerHTML = `<div class="view-header"><div><div class="eyebrow">GALACTIC CONTEXT · ${esc(state.settings.loreTrack)}</div><h1>The map keeps changing.</h1><p>${esc(era.summary)} The Lore Guard protects recognizable major anchors while your personal history fills in the spaces between them.</p></div><div class="tag accent">${esc(era.chronology)}</div></div><div class="view-grid"><div class="timeline-card full"><div class="eyebrow">Timeline anchor</div><h2>${esc(era.name)}</h2><p>${esc(era.custom ? era.customNote : `Key anchors: ${era.anchors.join(" · ")}.`)}</p><div class="timeline-track">${nodes}</div></div><div class="data-card"><h3>Active storylines</h3><div class="thread-list">${threads || "<p>No threads detected.</p>"}</div></div><div class="data-card"><h3>Faction signals</h3><div class="stat-list">${factions}</div></div><div class="data-card full"><h3>Known locations · ${state.visitedLocations.length} visited</h3><div class="identity-row">${state.visitedLocations.map(location => `<span class="tag good">⌖ ${esc(location)}</span>`).join("")}</div><p>${esc(state.world.lastPulse)}</p></div></div>`;
+    }
+
+    function renderJournalView() {
+      $("journalView").innerHTML = `<div class="view-header"><div><div class="eyebrow">CHRONICLE · ${state.log.length} ENTRIES</div><h1>Your version of history.</h1><p>The important record is not just what happened. It is who was there, what it cost, and which version of you made the decision.</p></div><div class="tag">Cycle ${state.day}</div></div><div class="view-grid"><div class="data-card full"><h3>Chronological history</h3><div class="history-list">${state.log.slice().reverse().map(entry => `<div class="history-item"><span class="history-day">C${esc(entry.day)}</span><div><strong>${esc(entry.title)}</strong><p>${esc(entry.text)}</p></div></div>`).join("")}</div></div><div class="data-card"><h3>Campaign facts</h3><div class="identity-row"><span class="tag">${esc(state.timeline.name)}</span><span class="tag">${esc(state.scenario.name)}</span><span class="tag">${state.world.timelineDrift}% timeline drift</span><span class="tag">${state.visitedLocations.length} locations</span></div><p>Seeded galaxy state is preserved in your save. Export the JSON if you want to archive this timeline or move it to another device.</p></div><div class="data-card"><h3>World news</h3><div class="history-list">${state.world.news.slice(0, 5).map((news, index) => `<div class="history-item" style="border-left-color:${index === 0 ? "var(--cyan)" : "var(--dim)"}"><span class="history-day">NEWS</span><div><p>${esc(news)}</p></div></div>`).join("")}</div></div></div>`;
+    }
+
+    function renderSaveView() {
+      if (!state) return;
+      const saved = state.savedAt ? new Date(state.savedAt).toLocaleString() : "Not saved this session";
+      $("saveView").innerHTML = `<div class="view-header"><div><div class="eyebrow">PERSISTENCE LAYER</div><h1>Keep this timeline.</h1><p>Local save stores the complete campaign: character, world state, relationships, threads, history, and the current unresolved scene.</p></div><div class="tag good">${esc(saved)}</div></div><div class="view-grid"><div class="save-card full"><div><h3>Device checkpoint</h3><p>${esc(state.player.name)} · ${esc(state.timeline.name)} · Cycle ${state.day}</p></div><div class="save-actions"><button class="btn small primary" type="button" data-save="local">Save checkpoint</button><button class="btn small" type="button" data-save="load">Load checkpoint</button></div></div><div class="save-card full"><div><h3>Portable JSON save</h3><p>Export to keep a backup or import it on another browser.</p></div><div class="save-actions"><button class="btn small" type="button" data-save="export">Export save</button><button class="btn small" type="button" data-save="import">Import save</button></div></div><div class="data-card"><h3>Save behavior</h3><p>The game autosaves after starting, choices, relationship actions, and major world pulses. Manual checkpoints use the same slot. If browser storage is unavailable, export the JSON file.</p></div><div class="data-card"><h3>Campaign seed</h3><p><strong>${esc(state.rngState)}</strong><br>Seed state is internal so future choices continue to feel unpredictable while remaining recoverable inside the save.</p></div></div>`;
+      $("saveView").querySelectorAll("[data-save]").forEach(button => button.addEventListener("click", () => { const action = button.dataset.save; if (action === "local") manualSave(); if (action === "load") { const loaded = loadStoredState(); if (loaded) loadCampaign(loaded); else showToast("No device checkpoint found."); } if (action === "export") exportSave(); if (action === "import") $("importFile").click(); }));
+    }
+
+    function bindEvents() {
+      $("modeRandom").addEventListener("click", () => { setupMode = "random"; $("modeRandom").classList.add("active"); $("modeCustom").classList.remove("active"); $("timelineMode").value = "random"; updatePreview(); });
+      $("modeCustom").addEventListener("click", () => { setupMode = "custom"; $("modeCustom").classList.add("active"); $("modeRandom").classList.remove("active"); $("timelineMode").value = "choose"; updatePreview(); });
+      ["timelineMode", "eraSelect", "loreTrack", "scenarioSelect", "customTimeline", "customScenario", "playerName", "pronouns", "speciesSelect", "originSelect", "archetypeSelect", "forcePathSelect", "tone", "pacing", "difficulty", "seed"].forEach(id => $(id).addEventListener("input", updatePreview));
+      $("randomizeBtn").addEventListener("click", randomizeSetup);
+      $("startBtn").addEventListener("click", () => createCampaign(setupConfig()));
+      $("continueBtn").addEventListener("click", () => loadCampaign(loadStoredState()));
+      $("topSaveBtn").addEventListener("click", () => manualSave());
+      $("newCampaignBtn").addEventListener("click", () => { if (confirm("Start a new campaign? Your current campaign is saved locally first.")) { manualSave(false); state = null; showSetup(); } });
+      $("importFile").addEventListener("change", event => importSaveFile(event.target.files[0]));
+      document.querySelectorAll(".nav button").forEach(button => button.addEventListener("click", () => setActiveView(button.dataset.view)));
+    }
+
+    populateSetup();
+    bindEvents();
+  </script>
+</body>
+</html>

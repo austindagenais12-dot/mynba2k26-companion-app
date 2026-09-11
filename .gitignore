@@ -1,11 +1,7 @@
 node_modules/
 .expo/
 android/
+ios/
 dist/
-web-build/
-*.log
-*.jks
-*.keystore
-local.properties
-.DS_Store
-assets/icon-artwork-master.png
+*.apk
+*.aab
